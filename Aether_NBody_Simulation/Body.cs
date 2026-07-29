@@ -37,7 +37,22 @@ public sealed class Body
     /// </summary>
     public float Radius { get; set; }
 
+    /// <summary>
+    /// Color visual del cuerpo.
+    /// </summary>
     public Color Color { get; set; }
+
+    /// <summary>
+    /// Puntos recientes de la trayectoria del cuerpo para dibujar una estela.
+    /// </summary>
+    public List<Vector2> TrailPoints { get; } = new();
+
+    /// <summary>
+    /// Número máximo de puntos que se guardan en la estela.
+    /// Con 500 puntos a 60 FPS, la estela cubre aproximadamente 8.3 segundos de historia.
+    /// Esto es suficiente para ver casi una órbita completa en la mayoría de casos.
+    /// </summary>
+    public int MaxTrailPoints { get; set; } = 500;
 
     /// <summary>
     /// Inicializa una nueva instancia de <see cref="Body"/>.
@@ -59,5 +74,25 @@ public sealed class Body
     public Body CloneBody()
     {
         return new Body(Position, Velocity, Mass, Radius, Color);
+    }
+
+    /// <summary>
+    /// Registra la posición actual en la estela del cuerpo.
+    /// </summary>
+    /// <remarks>
+    /// Se llama una vez por frame desde PhysicsEngine.Update().
+    /// Mantiene un histórico de posiciones recientes que se dibuja como una línea
+    /// blanca semi-transparente (estela) en cada paso de render.
+    /// </remarks>
+    public void RecordTrailPoint()
+    {
+        TrailPoints.Add(Position);
+
+        // Si la estela supera el máximo, eliminamos el punto más antiguo (estructura FIFO).
+        // Esto mantiene un tamaño constante y evita gastar memoria sin límite.
+        if (TrailPoints.Count > MaxTrailPoints)
+        {
+            TrailPoints.RemoveAt(0);
+        }
     }
 }
