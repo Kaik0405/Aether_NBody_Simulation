@@ -1,0 +1,14 @@
+D:\Cibernética\Proyects\Aether_NBody_Simulation\Aether_NBody_Simulation\bin\Debug\net10.0\Aether_NBody_Simulation.exe
+D:\Cibernética\Proyects\Aether_NBody_Simulation\Aether_NBody_Simulation\bin\Debug\net10.0\Aether_NBody_Simulation.deps.json
+D:\Cibernética\Proyects\Aether_NBody_Simulation\Aether_NBody_Simulation\bin\Debug\net10.0\Aether_NBody_Simulation.runtimeconfig.json
+D:\Cibernética\Proyects\Aether_NBody_Simulation\Aether_NBody_Simulation\bin\Debug\net10.0\Aether_NBody_Simulation.dll
+D:\Cibernética\Proyects\Aether_NBody_Simulation\Aether_NBody_Simulation\bin\Debug\net10.0\Aether_NBody_Simulation.pdb
+D:\Cibernética\Proyects\Aether_NBody_Simulation\Aether_NBody_Simulation\obj\Debug\net10.0\Aether_NBody_Simulation.GeneratedMSBuildEditorConfig.editorconfig
+D:\Cibernética\Proyects\Aether_NBody_Simulation\Aether_NBody_Simulation\obj\Debug\net10.0\Aether_NBody_Simulation.AssemblyInfoInputs.cache
+D:\Cibernética\Proyects\Aether_NBody_Simulation\Aether_NBody_Simulation\obj\Debug\net10.0\Aether_NBody_Simulation.AssemblyInfo.cs
+D:\Cibernética\Proyects\Aether_NBody_Simulation\Aether_NBody_Simulation\obj\Debug\net10.0\Aether_NBody_Simulation.csproj.CoreCompileInputs.cache
+D:\Cibernética\Proyects\Aether_NBody_Simulation\Aether_NBody_Simulation\obj\Debug\net10.0\Aether_NBody_Simulation.dll
+D:\Cibernética\Proyects\Aether_NBody_Simulation\Aether_NBody_Simulation\obj\Debug\net10.0\refint\Aether_NBody_Simulation.dll
+D:\Cibernética\Proyects\Aether_NBody_Simulation\Aether_NBody_Simulation\obj\Debug\net10.0\Aether_NBody_Simulation.pdb
+D:\Cibernética\Proyects\Aether_NBody_Simulation\Aether_NBody_Simulation\obj\Debug\net10.0\Aether_NBody_Simulation.genruntimeconfig.cache
+D:\Cibernética\Proyects\Aether_NBody_Simulation\Aether_NBody_Simulation\obj\Debug\net10.0\ref\Aether_NBody_Simulation.dll
