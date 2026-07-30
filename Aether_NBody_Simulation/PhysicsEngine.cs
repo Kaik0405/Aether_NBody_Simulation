@@ -5,33 +5,16 @@ namespace Aether_NBody_Simulation;
 /// <summary>
 /// Motor de física del simulador.
 /// </summary>
-/// <remarks>
-/// Por ahora actúa como esqueleto mínimo para dejar lista la integración futura
-/// de RK4, cálculo de fuerzas, Barnes-Hut y paralelización.
-/// </remarks>
+
 public sealed class PhysicsEngine
 {
     private const float GravitationalConstant = 1f; // Constante gravitatoria en unidades simplificadas.
     private const float Epsilon = 5f; // Distancia mínima para evitar singularidades.
 
-    // === NOTAS IMPORTANTES SOBRE LA FÍSICA ===
-    //
-    // GravitationalConstant:
-    //   En la física real, G ≈ 6.67e-11 N·m²/kg². Aquí usamos 1.0 para escala visual.
-    //   La fórmula es F = G * m1 * m2 / r², y la aceleración es a = G * m / r².
-    //   Cambiar este valor escala todas las fuerzas (órbitas más rápidas/lentas).
-    //
-    // Epsilon (regularización):
-    //   Evita singularidades cuando r → 0 (dos cuerpos muy cerca).
-    //   Sin Epsilon, a = G * m / r² → ∞ cuando r → 0, lo que rompe la simulación.
-    //   Con Epsilon, la distancia efectiva es sqrt(r² + ε²), suavizando el comportamiento.
-    //   Prueba valores pequeños si quieres órbitas más "suave", o grandes para menos sensibilidad.
-
     /// <summary>
     /// Actualiza el estado físico de todos los cuerpos durante un paso temporal.
     /// </summary>
-    /// <param name="bodies">Lista de cuerpos a actualizar.</param>
-    /// <param name="dt">Paso de tiempo, en segundos simulados.</param>
+
     public void Update(List<Body> bodies, float dt)
     {
         StepRK4(bodies, dt);
@@ -45,10 +28,6 @@ public sealed class PhysicsEngine
     /// <summary>
     /// Calcula la aceleración gravitatoria ejercida sobre cada cuerpo.
     /// </summary>
-    /// <param name="positions">Posiciones actuales de todos los cuerpos.</param>
-    /// <param name="bodies">Lista de cuerpos del sistema.</param>
-    /// <returns>Un array con la aceleración de cada cuerpo.</returns>
-    /// <remarks>
     /// FUNCIÓN CRÍTICA: calcula la aceleración de cada cuerpo sumando
     /// la atracción gravitatoria de todos los demás.
     ///

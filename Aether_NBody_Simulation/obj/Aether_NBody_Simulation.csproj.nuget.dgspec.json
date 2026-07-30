@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "d:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\Aether_NBody_Simulation.csproj": {}
+    "D:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\Aether_NBody_Simulation.csproj": {}
   },
   "projects": {
-    "d:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\Aether_NBody_Simulation.csproj": {
+    "D:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\Aether_NBody_Simulation.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "d:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\Aether_NBody_Simulation.csproj",
+        "projectUniqueName": "D:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\Aether_NBody_Simulation.csproj",
         "projectName": "Aether_NBody_Simulation",
-        "projectPath": "d:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\Aether_NBody_Simulation.csproj",
+        "projectPath": "D:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\Aether_NBody_Simulation.csproj",
         "packagesPath": "C:\\Users\\Alejandro\\.nuget\\packages\\",
-        "outputPath": "d:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\obj\\",
+        "outputPath": "D:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Alejandro\\AppData\\Roaming\\NuGet\\NuGet.Config",
