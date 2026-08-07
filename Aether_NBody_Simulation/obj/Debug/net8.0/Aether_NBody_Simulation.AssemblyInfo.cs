@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Aether_NBody_Simulation")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2e1695767560c9e4eb82244c822de0094cd4729c")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+077e0a722f412db3a4105c85a8cdb80660bcffa3")]
 [assembly: System.Reflection.AssemblyProductAttribute("Aether_NBody_Simulation")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Aether_NBody_Simulation")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

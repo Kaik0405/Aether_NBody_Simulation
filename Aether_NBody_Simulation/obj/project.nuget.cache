@@ -1,10 +1,18 @@
 {
   "version": 2,
-  "dgSpecHash": "EYTK5wRR2PE=",
+  "dgSpecHash": "plibZB6k7hw=",
   "success": true,
-  "projectFilePath": "D:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\Aether_NBody_Simulation.csproj",
+  "projectFilePath": "d:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\Aether_NBody_Simulation.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\Alejandro\\.nuget\\packages\\raylib-cs\\8.0.0\\raylib-cs.8.0.0.nupkg.sha512"
+    "C:\\Users\\Alejandro\\.nuget\\packages\\dapper\\2.1.79\\dapper.2.1.79.nupkg.sha512",
+    "C:\\Users\\Alejandro\\.nuget\\packages\\microsoft.data.sqlite\\10.0.10\\microsoft.data.sqlite.10.0.10.nupkg.sha512",
+    "C:\\Users\\Alejandro\\.nuget\\packages\\microsoft.data.sqlite.core\\10.0.10\\microsoft.data.sqlite.core.10.0.10.nupkg.sha512",
+    "C:\\Users\\Alejandro\\.nuget\\packages\\raylib-cs\\8.0.0\\raylib-cs.8.0.0.nupkg.sha512",
+    "C:\\Users\\Alejandro\\.nuget\\packages\\sqlitepclraw.bundle_e_sqlite3\\2.1.11\\sqlitepclraw.bundle_e_sqlite3.2.1.11.nupkg.sha512",
+    "C:\\Users\\Alejandro\\.nuget\\packages\\sqlitepclraw.core\\2.1.11\\sqlitepclraw.core.2.1.11.nupkg.sha512",
+    "C:\\Users\\Alejandro\\.nuget\\packages\\sqlitepclraw.lib.e_sqlite3\\2.1.11\\sqlitepclraw.lib.e_sqlite3.2.1.11.nupkg.sha512",
+    "C:\\Users\\Alejandro\\.nuget\\packages\\sqlitepclraw.provider.e_sqlite3\\2.1.11\\sqlitepclraw.provider.e_sqlite3.2.1.11.nupkg.sha512",
+    "C:\\Users\\Alejandro\\.nuget\\packages\\system.memory\\4.5.3\\system.memory.4.5.3.nupkg.sha512"
   ],
   "logs": []
 }

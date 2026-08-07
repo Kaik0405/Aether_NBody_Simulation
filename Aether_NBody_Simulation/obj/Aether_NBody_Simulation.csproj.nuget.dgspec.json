@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "D:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\Aether_NBody_Simulation.csproj": {}
+    "d:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\Aether_NBody_Simulation.csproj": {}
   },
   "projects": {
-    "D:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\Aether_NBody_Simulation.csproj": {
+    "d:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\Aether_NBody_Simulation.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\Aether_NBody_Simulation.csproj",
+        "projectUniqueName": "d:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\Aether_NBody_Simulation.csproj",
         "projectName": "Aether_NBody_Simulation",
-        "projectPath": "D:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\Aether_NBody_Simulation.csproj",
+        "projectPath": "d:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\Aether_NBody_Simulation.csproj",
         "packagesPath": "C:\\Users\\Alejandro\\.nuget\\packages\\",
-        "outputPath": "D:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\obj\\",
+        "outputPath": "d:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_NBody_Simulation\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Alejandro\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -48,6 +48,14 @@
           "framework": "net8.0",
           "targetAlias": "net8.0",
           "dependencies": {
+            "Dapper": {
+              "target": "Package",
+              "version": "[2.1.79, )"
+            },
+            "Microsoft.Data.Sqlite": {
+              "target": "Package",
+              "version": "[10.0.10, )"
+            },
             "Raylib-cs": {
               "target": "Package",
               "version": "[8.0.0, )"

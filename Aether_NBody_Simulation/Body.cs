@@ -4,64 +4,46 @@ using Raylib_cs;
 namespace Aether_NBody_Simulation;
 
 /// <summary>
-/// Representa un cuerpo puntual del simulador.
+/// Representa un cuerpo celeste genérico del simulador.
 /// </summary>
 /// <remarks>
-/// Esta clase está pensada para crecer sin romper la API pública:
-/// en el futuro podrá participar en RK4, Barnes-Hut, multithreading y telemetría.
+/// La clase base conserva la API actual del motor, pero ahora puede especializarse en estrellas,
+/// planetas, agujeros negros o asteroides para que el diseño sea más claro a futuro.
 /// </remarks>
-public sealed class Body
+public class Body
 {
-    /// <summary>
-    /// Posición actual en coordenadas del mundo.
-    /// </summary>
+    /// <summary>Posición actual del cuerpo en el espacio del mundo.</summary>
     public Vector2 Position { get; set; }
 
-    /// <summary>
-    /// Velocidad actual del cuerpo.
-    /// </summary>
+    /// <summary>Velocidad actual del cuerpo.</summary>
     public Vector2 Velocity { get; set; }
 
-    /// <summary>
-    /// Aceleración actual calculada por el motor físico.
-    /// </summary>
+    /// <summary>Aceleración actual calculada por el motor.</summary>
     public Vector2 Acceleration { get; set; }
 
-    /// <summary>
-    /// Masa del cuerpo, usada para el cálculo gravitatorio.
-    /// </summary>
+    /// <summary>Masa del cuerpo usada por la gravedad.</summary>
     public float Mass { get; set; }
 
-    /// <summary>
-    /// Radio visual/físico del cuerpo.
-    /// </summary>
+    /// <summary>Radio visual y de interacción del cuerpo.</summary>
     public float Radius { get; set; }
 
-    /// <summary>
-    /// Color visual del cuerpo.
-    /// </summary>
+    /// <summary>Color visual del cuerpo.</summary>
     public Color Color { get; set; }
 
-    /// <summary>
-    /// Puntos recientes de la trayectoria del cuerpo para dibujar una estela.
-    /// </summary>
+    /// <summary>Tipo semántico del cuerpo para distinguir su rol.</summary>
+    public BodyKind Kind { get; protected set; }
+
+    /// <summary>Nombre visual del tipo para mostrarlo en la UI o logs.</summary>
+    public virtual string TypeName => Kind.ToString();
+
+    /// <summary>Puntos recientes de la trayectoria del cuerpo.</summary>
     public List<Vector2> TrailPoints { get; } = new();
 
-    /// <summary>
-    /// Número máximo de puntos que se guardan en la estela.
-    /// Con 500 puntos a 60 FPS, la estela cubre aproximadamente 8.3 segundos de historia.
-    /// Esto es suficiente para ver casi una órbita completa en la mayoría de casos.
-    /// </summary>
+    /// <summary>Número máximo de puntos guardados en la estela.</summary>
     public int MaxTrailPoints { get; set; } = 500;
 
-    /// <summary>
-    /// Inicializa una nueva instancia de <see cref="Body"/>.
-    /// </summary>
-    /// <param name="position">Posición inicial.</param>
-    /// <param name="velocity">Velocidad inicial.</param>
-    /// <param name="mass">Masa del cuerpo.</param>
-    /// <param name="radius">Radio visual/físico del cuerpo.</param>
-    public Body(Vector2 position, Vector2 velocity, float mass, float radius, Color color)
+    /// <summary>Inicializa un cuerpo con los datos base.</summary>
+    public Body(Vector2 position, Vector2 velocity, float mass, float radius, Color color, BodyKind kind)
     {
         Position = position;
         Velocity = velocity;
@@ -69,30 +51,100 @@ public sealed class Body
         Mass = mass;
         Radius = radius;
         Color = color;
+        Kind = kind;
     }
 
-    public Body CloneBody()
+    /// <summary>Crea una copia del cuerpo manteniendo su estado actual.</summary>
+    public virtual Body CloneBody()
     {
-        return new Body(Position, Velocity, Mass, Radius, Color);
+        return new Body(Position, Velocity, Mass, Radius, Color, Kind)
+        {
+            Acceleration = Acceleration,
+            MaxTrailPoints = MaxTrailPoints
+        };
     }
 
-    /// <summary>
-    /// Registra la posición actual en la estela del cuerpo.
-    /// </summary>
-    /// <remarks>
-    /// Se llama una vez por frame desde PhysicsEngine.Update().
-    /// Mantiene un histórico de posiciones recientes que se dibuja como una línea
-    /// blanca semi-transparente (estela) en cada paso de render.
-    /// </remarks>
+    /// <summary>Registra la posición actual en la estela del cuerpo.</summary>
     public void RecordTrailPoint()
     {
         TrailPoints.Add(Position);
 
-        // Si la estela supera el máximo, eliminamos el punto más antiguo (estructura FIFO).
-        // Esto mantiene un tamaño constante y evita gastar memoria sin límite.
+        // Mantiene la estela acotada para evitar crecimiento infinito y conservar rendimiento.
         if (TrailPoints.Count > MaxTrailPoints)
         {
             TrailPoints.RemoveAt(0);
         }
+    }
+}
+
+/// <summary>Un cuerpo con comportamiento de estrella: suele ser la fuente central del sistema.</summary>
+public sealed class StarBody : Body
+{
+    public StarBody(Vector2 position, Vector2 velocity, float mass, float radius, Color color)
+        : base(position, velocity, mass, radius, color, BodyKind.Star)
+    {
+    }
+
+    public override Body CloneBody()
+    {
+        return new StarBody(Position, Velocity, Mass, Radius, Color)
+        {
+            Acceleration = Acceleration,
+            MaxTrailPoints = MaxTrailPoints
+        };
+    }
+}
+
+/// <summary>Un cuerpo con comportamiento de planeta: orbita normalmente alrededor de una estrella.</summary>
+public sealed class PlanetBody : Body
+{
+    public PlanetBody(Vector2 position, Vector2 velocity, float mass, float radius, Color color)
+        : base(position, velocity, mass, radius, color, BodyKind.Planet)
+    {
+    }
+
+    public override Body CloneBody()
+    {
+        return new PlanetBody(Position, Velocity, Mass, Radius, Color)
+        {
+            Acceleration = Acceleration,
+            MaxTrailPoints = MaxTrailPoints
+        };
+    }
+}
+
+/// <summary>Un cuerpo de alto impacto gravitatorio, útil para sistemas extremos o caóticos.</summary>
+public sealed class BlackHoleBody : Body
+{
+    public BlackHoleBody(Vector2 position, Vector2 velocity, float mass, float radius, Color color)
+        : base(position, velocity, mass, radius, color, BodyKind.BlackHole)
+    {
+    }
+
+    public override Body CloneBody()
+    {
+        return new BlackHoleBody(Position, Velocity, Mass, Radius, Color)
+        {
+            Acceleration = Acceleration,
+            MaxTrailPoints = MaxTrailPoints
+        };
+    }
+}
+
+/// <summary>Un cuerpo pequeño, normalmente usado para cinturones de asteroides o restos.</summary>
+public sealed class AsteroidBody : Body
+{
+    public AsteroidBody(Vector2 position, Vector2 velocity, float mass, float radius, Color color)
+        : base(position, velocity, mass, radius, color, BodyKind.Asteroid)
+    {
+    }
+
+    public override Body CloneBody()
+    {
+        return new AsteroidBody(Position, Velocity, Mass, Radius, Color)
+        {
+            Acceleration = Acceleration,
+            MaxTrailPoints = MaxTrailPoints
+        };
     }
 }
