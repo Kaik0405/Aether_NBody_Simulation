@@ -20,7 +20,7 @@ public class SimulationRepository
     {
         using var connection = new SqliteConnection(connectionString);
         
-        // Si las tablas no existen, las crea automáticamente
+        // Si las tablas no existen, se crean automáticamente al arrancar la aplicación.
         string createTablesSql = @"
             CREATE TABLE IF NOT EXISTS Simulations (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,6 +68,7 @@ public class SimulationRepository
 
     public int SaveSimulation(string name, List<Body> bodies)
     {
+        // Guarda la simulación y todos sus cuerpos en una transacción para evitar estados parciales.
         using var connection = new SqliteConnection(connectionString);
         connection.Open();
         using var tx = connection.BeginTransaction();
@@ -103,6 +104,7 @@ public class SimulationRepository
 
     public List<Body> LoadSimulation(int simulationId)
     {
+        // Recompone los cuerpos desde la tabla plana de la base de datos.
         using var connection = new SqliteConnection(connectionString);
         
         string sql = "SELECT * FROM Bodies WHERE SimulationId = @SimId";
@@ -130,6 +132,34 @@ public class SimulationRepository
         using var connection = new SqliteConnection(connectionString);
         const string sql = "SELECT Id, Name, CreatedAt FROM Simulations ORDER BY Id DESC";
         return connection.Query<SimulationRecord>(sql).ToList();
+    }
+
+    public bool RenameSimulation(int simulationId, string newName)
+    {
+        // Evita nombres vacíos y actualiza únicamente el nombre de la simulación.
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            return false;
+        }
+
+        using var connection = new SqliteConnection(connectionString);
+        const string sql = "UPDATE Simulations SET Name = @Name WHERE Id = @Id";
+        int rows = connection.Execute(sql, new { Id = simulationId, Name = newName.Trim() });
+        return rows > 0;
+    }
+
+    public bool DeleteSimulation(int simulationId)
+    {
+        // El borrado se hace en una transacción para eliminar tanto la cabecera como sus cuerpos.
+        using var connection = new SqliteConnection(connectionString);
+        connection.Open();
+        using var tx = connection.BeginTransaction();
+
+        connection.Execute("DELETE FROM Bodies WHERE SimulationId = @Id", new { Id = simulationId }, tx);
+        int removed = connection.Execute("DELETE FROM Simulations WHERE Id = @Id", new { Id = simulationId }, tx);
+
+        tx.Commit();
+        return removed > 0;
     }
 
     public SimulationRecord? GetLatestSimulation()
