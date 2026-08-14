@@ -1,9 +1,17 @@
 ﻿using System.Numerics;
+using System.Diagnostics;
 using Aether_NBody_Simulation;
 using Raylib_cs;
 
 const int initialWindowWidth = 1820;
 const int initialWindowHeight = 980;
+
+var cliArgs = Environment.GetCommandLineArgs().Skip(1).ToHashSet(StringComparer.OrdinalIgnoreCase);
+if (cliArgs.Contains("--benchmark-quadtree"))
+{
+    RunPerformanceBenchmark();
+    return;
+}
 
 // Enable window resizing so maximize/fullscreen work naturally.
 Raylib.SetConfigFlags((ConfigFlags)4);
@@ -16,7 +24,11 @@ Raylib.MaximizeWindow();
 // Servicios principales: almacenamiento, catálogo de escenas y motor físico.
 var repository = new SimulationRepository();
 var scenes = GalaxyBuilder.GetAvailableScenes();
-var physicsEngine = new PhysicsEngine();
+var physicsEngine = new PhysicsEngine
+{
+    SolverMode = PhysicsSolverMode.Quadtree,
+    RecordTrails = false
+};
 
 // Cámara 2D usada para navegar por la simulación con zoom y desplazamiento.
 var camera = new Camera2D
@@ -419,31 +431,10 @@ static void DrawBodies(List<Body> bodies, Camera2D camera)
 
     foreach (var body in bodies)
     {
-        DrawTrail(body);
         Raylib.DrawCircleV(body.Position, body.Radius, body.Color);
     }
 
     Raylib.EndMode2D();
-}
-
-static void DrawTrail(Body body)
-{
-    // If there are not enough points yet, skip the trail.
-    if (body.TrailPoints.Count < 2)
-    {
-        return;
-    }
-
-    // Consecutive segments with increasing alpha create a smooth trail.
-    for (int i = 1; i < body.TrailPoints.Count; i++)
-    {
-        Vector2 prev = body.TrailPoints[i - 1];
-        Vector2 cur = body.TrailPoints[i];
-        float progress = i / (float)body.TrailPoints.Count;
-        byte alpha = (byte)(30 + progress * 225f);
-        Color trailColor = new Color(body.Color.R, body.Color.G, body.Color.B, alpha);
-        Raylib.DrawLineV(prev, cur, trailColor);
-    }
 }
 
 static void DrawUiPanel(
@@ -577,6 +568,62 @@ static string ClipText(string text, int maxLength)
     }
 
     return text[..(maxLength - 1)] + "…";
+}
+
+static void RunPerformanceBenchmark()
+{
+    // La comparación usa un número suficiente de cuerpos para que la diferencia entre O(n²) y Barnes-Hut sea visible.
+    const float dt = 1f / 60f;
+    const int compareBodies = 3000;
+    const int stressBodies = 12000;
+    const int compareSteps = 3;
+    const int stressSteps = 6;
+
+    Console.WriteLine("=== N-Body Benchmark (Naive vs Quadtree) ===");
+    Console.WriteLine($"Comparison bodies: {compareBodies} | Stress bodies: {stressBodies}");
+    Console.WriteLine();
+
+    List<Body> comparisonTemplate = GalaxyBuilder.CreateQuadtreeStressSystem(compareBodies);
+    MeasureScenario("Old method (Naive)", comparisonTemplate, PhysicsSolverMode.Naive, compareSteps, dt);
+    MeasureScenario("New method (Quadtree)", comparisonTemplate, PhysicsSolverMode.Quadtree, compareSteps, dt);
+
+    Console.WriteLine();
+    List<Body> stressTemplate = GalaxyBuilder.CreateQuadtreeStressSystem(stressBodies);
+    MeasureScenario("Quadtree stress test", stressTemplate, PhysicsSolverMode.Quadtree, stressSteps, dt);
+}
+
+static void MeasureScenario(
+    string title,
+    List<Body> templateBodies,
+    PhysicsSolverMode solverMode,
+    int steps,
+    float dt)
+{
+    // Se clona el escenario base para que cada medición parta exactamente del mismo estado inicial.
+    var bodies = templateBodies.Select(b => b.CloneBody()).ToList();
+    var engine = new PhysicsEngine
+    {
+        SolverMode = solverMode,
+        RecordTrails = false,
+        Theta = 0.6f
+    };
+
+    // Warm-up corto para estabilizar JIT y evitar sesgo en la primera medida.
+    engine.Update(bodies, dt);
+
+    Stopwatch stopwatch = Stopwatch.StartNew();
+    for (int i = 0; i < steps; i++)
+    {
+        engine.Update(bodies, dt);
+    }
+
+    stopwatch.Stop();
+    double totalMs = stopwatch.Elapsed.TotalMilliseconds;
+    double msPerStep = totalMs / Math.Max(1, steps);
+
+    Console.WriteLine($"[{title}]");
+    Console.WriteLine($"Solver: {solverMode} | Bodies: {bodies.Count} | Steps: {steps}");
+    Console.WriteLine($"Total: {totalMs:F2} ms | Avg/step: {msPerStep:F2} ms");
 }
 
 readonly record struct UiLayout(

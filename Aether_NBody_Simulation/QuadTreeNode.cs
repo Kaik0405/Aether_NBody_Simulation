@@ -22,68 +22,72 @@ public struct BoundingBox
                point.Y <= Center.Y + HalfDimension;
     }
 }
+
 public class QuadTreeNode
 {
     public BoundingBox Boundary { get; private set; }
-    
-    // Propiedades físicas para Barnes-Hut (las calcularemos después)
+
+    // Propiedades físicas para Barnes-Hut.
     public float TotalMass { get; set; }
     public Vector2 CenterOfMass { get; set; }
 
-    // Si el nodo es una hoja, almacenará el cuerpo aquí. Si se subdivide, esto será null.
-    public Body Body { get; private set; }
+    // Si el nodo es hoja, guarda una única partícula.
+    public int BodyIndex { get; private set; } = -1;
+    public Vector2 BodyPosition { get; private set; }
+    public float BodyMass { get; private set; }
 
     // Los 4 hijos
-    public QuadTreeNode NW { get; private set; }
-    public QuadTreeNode NE { get; private set; }
-    public QuadTreeNode SW { get; private set; }
-    public QuadTreeNode SE { get; private set; }
+    public QuadTreeNode? NW { get; private set; }
+    public QuadTreeNode? NE { get; private set; }
+    public QuadTreeNode? SW { get; private set; }
+    public QuadTreeNode? SE { get; private set; }
 
     // Un nodo es hoja si no tiene hijos
     public bool IsLeaf => NW == null;
+    public bool IsEmpty => TotalMass <= 0f;
 
     public QuadTreeNode(BoundingBox boundary)
     {
         Boundary = boundary;
     }
 
-    // Método recursivo para insertar cuerpos
-    public bool Insert(Body newBody)
+    // Método recursivo para insertar una partícula en el árbol.
+    public bool Insert(int bodyIndex, Vector2 position, float mass)
     {
-        // 1. Si el cuerpo no está en los límites de este nodo, lo rechazamos
-        if (!Boundary.Contains(newBody.Position))
+        // Si la partícula cae fuera de este cuadrante, se descarta para que el algoritmo recorra el hijo correcto.
+        if (!Boundary.Contains(position))
             return false;
 
-        // 2. Si el nodo es hoja y está vacío, el cuerpo se queda aquí
-        if (IsLeaf && Body == null)
+        if (IsLeaf && BodyIndex < 0)
         {
-            Body = newBody;
+            BodyIndex = bodyIndex;
+            BodyPosition = position;
+            BodyMass = mass;
             return true;
         }
 
-        // 3. Si el nodo es hoja PERO ya tiene un cuerpo, hay un choque.
+        // Si el nodo es hoja y ya tiene una partícula, subdividimos.
         if (IsLeaf)
         {
-            // Trampa de seguridad: Si por error dos cuerpos tienen la misma posición exacta, 
-            // el QuadTree se subdividiría infinitamente hasta explotar la memoria RAM.
-            if (Vector2.Distance(Body.Position, newBody.Position) < 0.01f) 
-                return false; 
+            // Cuando un nodo hoja ya contiene una partícula, se divide para poder seguir insertando.
+            // Evita subdivisiones infinitas por posiciones idénticas.
+            if (Vector2.Distance(BodyPosition, position) < 0.0001f)
+            {
+                position += new Vector2(0.0003f, -0.0002f);
+            }
 
-            // Como hay choque, dividimos este nodo en 4
             Subdivide();
 
-            // Pasamos el cuerpo viejo a los nuevos hijos
-            InsertIntoChildren(Body);
-            
-            // Este nodo ya es "padre", no puede tener cuerpo propio
-            Body = null; 
+            InsertIntoChildren(BodyIndex, BodyPosition, BodyMass);
+            BodyIndex = -1;
+            BodyPosition = Vector2.Zero;
+            BodyMass = 0f;
         }
 
-        // 4. Insertamos el cuerpo nuevo en los hijos (como ya es padre, caerá donde toque)
-        return InsertIntoChildren(newBody);
+        return InsertIntoChildren(bodyIndex, position, mass);
     }
 
-    // Parte el nodo en 4 cuadrantes iguales (Recuerda: en Raylib Y crece hacia abajo)
+    // Parte el nodo en 4 cuadrantes iguales.
     private void Subdivide()
     {
         float quarter = Boundary.HalfDimension / 2f;
@@ -95,40 +99,67 @@ public class QuadTreeNode
         SE = new QuadTreeNode(new BoundingBox(new Vector2(c.X + quarter, c.Y + quarter), quarter));
     }
 
-    // Intenta meter el cuerpo en los hijos hasta que uno lo acepte
-    private bool InsertIntoChildren(Body b)
+    private bool InsertIntoChildren(int bodyIndex, Vector2 position, float mass)
     {
-        if (NW.Insert(b)) return true;
-        if (NE.Insert(b)) return true;
-        if (SW.Insert(b)) return true;
-        if (SE.Insert(b)) return true;
-        
+        if (NW!.Insert(bodyIndex, position, mass)) return true;
+        if (NE!.Insert(bodyIndex, position, mass)) return true;
+        if (SW!.Insert(bodyIndex, position, mass)) return true;
+        if (SE!.Insert(bodyIndex, position, mass)) return true;
+
         return false;
     }
-    private void CalculateMassCenter()
-    {
-        // Es hoja (un solo cuerpo)
-        if(IsLeaf && Body != null)
-        {
-            TotalMass = Body.Mass;
-            CenterOfMass = Body.Position;
-            return;    
-        }
-        // Es un nodo interno con hijos
-        TotalMass = 0f;
-        Vector2 weightSum = Vector2.Zero;
 
-        NW.CalculateMassCenter();
-        NE.CalculateMassCenter();
-        SW.CalculateMassCenter();
-        SE.CalculateMassCenter();
-        
-        TotalMass = NW.TotalMass + NE.TotalMass + SW.TotalMass + SE.TotalMass;
-        
-        weightSum = (NW.CenterOfMass * NW.TotalMass) + (NE.CenterOfMass * NE.TotalMass) +
-                    (SW.CenterOfMass + SW.TotalMass) + (SE.CenterOfMass * SE.TotalMass);
+    public void RecomputeMassDistribution()
+    {
+        // Las hojas conservan su masa y posición; los nodos internos las agregan desde los hijos.
+        if (IsLeaf)
+        {
+            if (BodyIndex >= 0)
+            {
+                TotalMass = BodyMass;
+                CenterOfMass = BodyPosition;
+            }
+            else
+            {
+                TotalMass = 0f;
+                CenterOfMass = Vector2.Zero;
+            }
+
+            return;
+        }
+
+        NW!.RecomputeMassDistribution();
+        NE!.RecomputeMassDistribution();
+        SW!.RecomputeMassDistribution();
+        SE!.RecomputeMassDistribution();
+
+        TotalMass = 0f;
+        Vector2 weightedSum = Vector2.Zero;
+
+        // Cada hijo aporta su masa total y su centro de masa ponderado.
+        AccumulateFromChild(NW, ref weightedSum);
+        AccumulateFromChild(NE, ref weightedSum);
+        AccumulateFromChild(SW, ref weightedSum);
+        AccumulateFromChild(SE, ref weightedSum);
 
         if (TotalMass > 0f)
-            CenterOfMass = weightSum / TotalMass;
+        {
+            CenterOfMass = weightedSum / TotalMass;
+        }
+        else
+        {
+            CenterOfMass = Vector2.Zero;
+        }
+    }
+
+    private void AccumulateFromChild(QuadTreeNode? child, ref Vector2 weightedSum)
+    {
+        if (child is null || child.TotalMass <= 0f)
+        {
+            return;
+        }
+
+        TotalMass += child.TotalMass;
+        weightedSum += child.CenterOfMass * child.TotalMass;
     }
 }

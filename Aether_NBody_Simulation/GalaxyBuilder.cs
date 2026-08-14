@@ -12,7 +12,9 @@ public static class GalaxyBuilder
         new("Tres cuerpos caótico", "Un sistema compacto con un agujero negro y dos cuerpos en órbita.", () => new SolarSystemScene("Tres cuerpos caótico", "Un sistema compacto con un agujero negro y dos cuerpos en órbita.", CreateChaoticThreeBodySystem())),
         new("Sistema binario", "Dos estrellas y un planeta que orbita alrededor del par.", () => new SolarSystemScene("Sistema binario", "Dos estrellas y un planeta que orbita alrededor del par.", CreateBinaryStarSystem())),
         new("Cinturón de asteroides", "Un sol central con miles de asteroides en órbita.", () => new GalaxyScene("Cinturón de asteroides", "Un sol central con miles de asteroides en órbita.", CreateAsteroidBeltSystem())),
-        new("Anillo orbital", "Un sistema de anillo con satélites alrededor de una estrella central.", () => new GalaxyScene("Anillo orbital", "Un sistema de anillo con satélites alrededor de una estrella central.", CreateOrbitalRingSystem()))
+        new("Anillo orbital", "Un sistema de anillo con satélites alrededor de una estrella central.", () => new GalaxyScene("Anillo orbital", "Un sistema de anillo con satélites alrededor de una estrella central.", CreateOrbitalRingSystem())),
+        new("Stress Quadtree 10000", "Escenario de estrés para Barnes-Hut con 10k cuerpos orbitando un núcleo.", () => new GalaxyScene("Stress Quadtree 10000", "Escenario de estrés para Barnes-Hut con 10k cuerpos orbitando un núcleo.", CreateQuadtreeStressSystem(2500))),
+        new("Colisión de galaxias", "Dos galaxias de 1000 cuerpos cada una en curso de choque directo.", () => new GalaxyScene("Colisión de galaxias", "Dos galaxias de 1000 cuerpos cada una en curso de choque directo.", CreateGalaxyCollisionSystem()))
     };
 
     public static List<Body> CreateTestGalaxy()
@@ -194,6 +196,122 @@ public static class GalaxyBuilder
                 mass: 90f,
                 radius: 5f + (i % 3),
                 color: new Color((byte)(180 + (i * 7) % 60), (byte)(120 + (i * 13) % 70), (byte)(220 - (i * 5) % 40), (byte)255)));
+        }
+
+        return bodies;
+    }
+
+    public static List<Body> CreateQuadtreeStressSystem(int bodyCount)
+    {
+        // Genera un conjunto grande y reproducible para medir Barnes-Hut con una distribución parecida a un disco galáctico.
+        int finalCount = Math.Max(1000, bodyCount);
+        var random = new Random(42);
+
+        var bodies = new List<Body>(finalCount + 1)
+        {
+            new StarBody(
+                position: Vector2.Zero,
+                velocity: Vector2.Zero,
+                mass: 12000000f,
+                radius: 56f,
+                color: new Color(255, 240, 120, 255))
+        };
+
+        for (int i = 0; i < finalCount; i++)
+        {
+            // Cada cuerpo recibe un radio orbital aleatorio y una velocidad tangencial para no caer todos al centro.
+            float angle = (float)(random.NextDouble() * MathF.Tau);
+            float radius = 240f + (float)random.NextDouble() * 4200f;
+
+            Vector2 radial = new(MathF.Cos(angle), MathF.Sin(angle));
+            Vector2 position = radial * radius;
+            Vector2 tangent = Vector2.Normalize(new Vector2(-radial.Y, radial.X));
+
+            float speed = 45f + (float)random.NextDouble() * 95f;
+            float jitter = ((float)random.NextDouble() - 0.5f) * 3f;
+
+            bodies.Add(new AsteroidBody(
+                position: position,
+                velocity: tangent * speed + radial * jitter,
+                mass: 8f + (float)random.NextDouble() * 24f,
+                radius: 1.6f + (float)random.NextDouble() * 2.6f,
+                color: new Color((byte)(120 + random.Next(120)), (byte)(120 + random.Next(120)), (byte)(120 + random.Next(120)), (byte)255)));
+        }
+
+        return bodies;
+    }
+    /// <summary>
+    /// Escenario de colisión masiva: Dos galaxias de 1000 cuerpos cada una en curso de choque directo.
+    /// Utiliza soles supermasivos en el centro de cada disco galáctico.
+    /// </summary>
+    public static List<Body> CreateGalaxyCollisionSystem()
+    {
+        // 2 galaxias * (1 sol central + 1000 cuerpos) = 2002 cuerpos en total
+        var bodies = new List<Body>(2002);
+        var random = new Random(777); // Semilla fija para reproducibilidad
+
+        // ==========================================
+        // GALAXIA 1 (Izquierda, viaja hacia la derecha)
+        // ==========================================
+        Vector2 posG1 = new Vector2(-1200f, 400f);
+        Vector2 velG1 = new Vector2(40f, -12f);
+        
+        // Sol supermasivo central (Galaxia 1)
+        bodies.Add(new StarBody(
+            position: posG1,
+            velocity: velG1,
+            mass: 5000000f,
+            radius: 48f,
+            color: new Color(255, 80, 80, 255))); // Tono anaranjado cálido
+
+        for (int i = 0; i < 1200; i++)
+        {
+            float angle = (float)(random.NextDouble() * MathF.Tau);
+            float radius = 100f + (float)random.NextDouble() * 600f; // Distribución del disco
+            
+            Vector2 radial = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
+            Vector2 tangent = new Vector2(-radial.Y, radial.X); // Rotación anti-horaria
+            
+            float orbitalSpeed = 50f + (float)random.NextDouble() * 70f;
+            
+            bodies.Add(new AsteroidBody(
+                position: posG1 + (radial * radius),
+                velocity: velG1 + (tangent * orbitalSpeed),
+                mass: 5f + (float)random.NextDouble() * 15f,
+                radius: 1.5f + (float)random.NextDouble() * 2f,
+                color: new Color((byte)(180 + random.Next(75)),(byte) 120, (byte)200, (byte)200)));
+        }
+
+        // ==========================================
+        // GALAXIA 2 (Derecha, viaja hacia la izquierda)
+        // ==========================================
+        Vector2 posG2 = new Vector2(1200f, -400f);
+        Vector2 velG2 = new Vector2(-40f, 12f);
+
+        // Sol supermasivo central (Galaxia 2)
+        bodies.Add(new StarBody(
+            position: posG2,
+            velocity: velG2,
+            mass: 5000000f,
+            radius: 48f,
+            color: new Color(100, 220, 255, 255))); // Tono azul brillante
+
+        for (int i = 0; i < 1200; i++)
+        {
+            float angle = (float)(random.NextDouble() * MathF.Tau);
+            float radius = 100f + (float)random.NextDouble() * 600f;
+            
+            Vector2 radial = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
+            Vector2 tangent = new Vector2(radial.Y, -radial.X); // Rotación horaria
+            
+            float orbitalSpeed = 50f + (float)random.NextDouble() * 70f;
+            
+            bodies.Add(new AsteroidBody(
+                position: posG2 + (radial * radius),
+                velocity: velG2 + (tangent * orbitalSpeed),
+                mass: 5f + (float)random.NextDouble() * 15f,
+                radius: 1.5f + (float)random.NextDouble() * 2f,
+                color: new Color((byte)100, (byte)200, (byte)(180 + random.Next(75)), (byte)200)));
         }
 
         return bodies;
