@@ -62,6 +62,7 @@ obj/Debug/net8.0/
  Aether_NBody_Simulation.GlobalUsings.g.cs
 PhysicsEngine.cs
 Program.cs
+QuadTreeNode.cs
 SceneModels.cs
 SimulationRepository.cs
 

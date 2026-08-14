@@ -10,13 +10,14 @@ public sealed class PhysicsEngine
 {
     private const float GravitationalConstant = 1f; // Constante gravitatoria en unidades simplificadas.
     private const float Epsilon = 5f; // Distancia mínima para evitar singularidades.
-
+    private const float Theta = 0.5f;
     /// <summary>
     /// Actualiza el estado físico de todos los cuerpos durante un paso temporal.
     /// </summary>
-
+    private QuadTreeNode quadTreeNode; // Arbol de particion espacial
     public void Update(List<Body> bodies, float dt)
     {
+        BuildQuadTree(bodies);
         StepRK4(bodies, dt);
 
         foreach (var body in bodies)
@@ -29,48 +30,54 @@ public sealed class PhysicsEngine
     /// Calcula la aceleración gravitatoria ejercida sobre cada cuerpo.
     /// </summary>
     
-    private Vector2[] CalculateAccelerations(Vector2[] positions, List<Body> bodies)
+    // Metodo recursivo para calcular las aceleraciones con el Quadtree
+    private Vector2 GetAccelerarionFromTree(Vector2 position,QuadTreeNode node, float theta, float G, float epsilon)
     {
-        var accelerations = new Vector2[bodies.Count];
+        if(node == null || node.IsEmpty)
+            return Vector2.Zero;
 
-        for (int i = 0; i < bodies.Count; i++)
+       // Si es hoja y es el mismo cuerpo
+        if(node.IsLeaf && node.Body.Position == position)
+            return Vector2.Zero;
+
+        Vector2 direction = node.CenterOfMass - position;
+        float distanceSq = direction.LengthSquared();
+        float distance = MathF.Sqrt(distanceSq);
+        float size = node.Boundary.HalfDimension / 2.0f;
+
+        // Criterio theta y si es hoja
+        if (node.IsLeaf || (size / distance)< theta)
         {
-            Vector2 acc = Vector2.Zero;
+            //Tratamos al nodo como un punto de masa consentrado
+            float forceMagnitude = (G * node.TotalMass) / (distanceSq+epsilon*epsilon);
+            Vector2 unitDirection = direction / (distance+0.0001f);
 
-            for (int j = 0; j < bodies.Count; j++)
-            {
-                if (i == j)
-                {
-                    continue;
-                }
-
-                // Vector de distancia relativa (de i hacia j).
-                Vector2 deltaX = positions[j] - positions[i];
-
-                // Distancia euclidiana con regularización:
-                // distanceSquared = dx² + dy² + ε²
-                // El Epsilon evita división entre cero cuando r=0.
-                float distanceSquared = deltaX.LengthSquared() + Epsilon * Epsilon;
-
-                // Inversa de r³ para la ley de gravitación.
-                float inverseDistanceCubed = 1f / (float)Math.Pow(distanceSquared, 1.5f);
-
-                // Aplicamos la ley: a⃗ += G * m_j * (r⃗ / r³)
-                acc += deltaX * (GravitationalConstant * bodies[j].Mass * inverseDistanceCubed);
-            }
-
-            // Aceleración total sobre el cuerpo i = suma de atracciones de todos los j.
-            accelerations[i] = acc;
+            return unitDirection*forceMagnitude;
         }
+        // Si esta muy cerca y no es hoja
+        Vector2 totalAcceleration = Vector2.Zero;
+
+        totalAcceleration = GetAccelerarionFromTree(position,node.NE,theta,G,epsilon);
+        totalAcceleration = totalAcceleration + GetAccelerarionFromTree(position,node.NW,theta,G,epsilon);
+        totalAcceleration = totalAcceleration + GetAccelerarionFromTree(position,node.SE,theta,G,epsilon);
+        totalAcceleration = totalAcceleration + GetAccelerarionFromTree(position,node.SW,theta,G,epsilon);
+        
+        return totalAcceleration;
+    }
+
+    // Metodo para calcular todas las aceleraciones de los cuerpos
+    private Vector2[] CalculateAccelerations(Vector2[] positions)
+    {
+        var accelerations = new Vector2[positions.Count];
+
+        for (int i = 0; i < positions.Count; i++)
+            accelerations[i] = GetAccelerarionFromTree(positions[i],quadTreeNode,Theta,GravitationalConstant,Epsilon);   
 
         return accelerations;
     }
 
-    /// <summary>
-    /// Avanza el sistema mediante una integración RK4 simple para el movimiento gravitatorio.
-    /// </summary>
-
-    public void StepRK4(List<Body> bodies, float dt)
+    // Metodo que soluciona la EDO que describle el movimiento de los cuerpos en el espacio con posciones y velocidades
+    private void StepRK4(List<Body> bodies, float dt)
     {
         int n = bodies.Count;
 
@@ -156,5 +163,47 @@ public sealed class PhysicsEngine
             // Guardamos la aceleración final como valor de referencia (útil en debug/telemetría).
             bodies[i].Acceleration = k4Velocity[i];
         }
+    }
+ 
+    // Funcion para calcular las dimenciones iniciales en las que de se van a dividir los cuadrantes
+    private (Vector2,float) CalculeteWorldBounds(List<Body> bodies)
+    {
+        // Verifica si hay cuerpos
+        if (bodies.Count == 0)
+            return(Vector2.Zero, 1000f);
+        
+        float minX = float.MaxValue, maxX = float.MinValue;
+        float minY = float.MaxValue, maxY = float.MinValue;
+
+        foreach (Body b in bodies)
+        {
+            if(b.Position.X < minX) minX = b.Position.X;
+            if(b.Position.Y < minY) minY = b.Position.Y;
+            if(b.Position.X > maxX) maxX = b.Position.X;
+            if(b.Position.Y > maxY) maxY = b.Position.Y;
+        }
+        // Determina el vector central usando la mitad de las sumas minimas y maximas de las coordenadas
+        Vector2 center = new Vector2((minX+maxX)/2f, (minY+maxY)/2f);
+        
+        float w = maxX-minX;
+        float h = maxY-minY;
+        
+        // Deter
+        float maxDimension = Math.Max(w, h);
+        float halfDimension = (maxDimension/2.0f) * 1.05f;
+        
+        if (halfDimension < 1.0f) halfDimension = 1.0f;
+
+        return (center, halfDimension);
+    } 
+    
+    //Metodo que construye el QuadTree incertando los nodos
+    private void BuildQuadTree(List<Body> bodies)
+    {
+        BoundingBox boundingBox = new BoundingBox(CalculeteWorldBounds(bodies));
+        quadTreeNode = new QuadTreeNode(boundingBox); 
+        
+        foreach (var body in bodies)
+            quadTree.Insert(body);
     }
 }
