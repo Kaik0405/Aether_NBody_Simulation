@@ -520,6 +520,8 @@ static void DrawUiPanel(
     Raylib.DrawText($"Status: {ClipText(statusMessage, 70)}", (int)layout.BottomBar.X + 12, (int)layout.BottomBar.Y + 8, 14, new Color(255, 255, 180, 255));
     Raylib.DrawText($"Name: {ClipText(saveName, 26)}", (int)layout.BottomBar.X + 12, (int)layout.BottomBar.Y + 30, 12, new Color(255, 255, 255, 255));
     Raylib.DrawText($"FPS: {Raylib.GetFPS()}", (int)layout.BottomBar.X + (int)layout.BottomBar.Width - 70, (int)layout.BottomBar.Y + 8, 14, new Color(255, 255, 0, 255));
+    float ms = Raylib.GetFrameTime() * 1000f;
+    Raylib.DrawText($"Frame time: {ms:F2} ms", (int)layout.BottomBar.X + (int)layout.BottomBar.Width - 135, (int)layout.BottomBar.Y + 30, 12, new Color(255, 255, 0, 255));
     Raylib.DrawText("F10 maximize | F11 fullscreen | C scene | Space pause", (int)layout.BottomBar.X + 12, (int)layout.BottomBar.Y + 46, 12, new Color(180, 200, 255, 255));
 }
 

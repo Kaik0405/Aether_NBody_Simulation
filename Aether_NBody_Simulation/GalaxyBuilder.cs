@@ -9,23 +9,17 @@ public static class GalaxyBuilder
     public static IReadOnlyList<SceneDefinition> GetAvailableScenes() => new List<SceneDefinition>
     {
         new("Sistema de prueba", "Un sistema solar simple con una estrella y varios planetas.", () => new SolarSystemScene("Sistema de prueba", "Un sistema solar simple con una estrella y varios planetas.", CreateTestGalaxy())),
-        new("Tres cuerpos caótico", "Un sistema compacto con un agujero negro y dos cuerpos en órbita.", () => new SolarSystemScene("Tres cuerpos caótico", "Un sistema compacto con un agujero negro y dos cuerpos en órbita.", CreateChaoticThreeBodySystem())),
+        new("Tres cuerpos caótico", "Un sistema compacto con un agujero negro y dos cuerpos en órbita.", () => new SolarSystemScene("Tres cuerpos caótico", "Un sistema compacto con un agujero negro y dos cuerpos en órbita.", CreateChaoticThreeBodySystem2())),
         new("Sistema binario", "Dos estrellas y un planeta que orbita alrededor del par.", () => new SolarSystemScene("Sistema binario", "Dos estrellas y un planeta que orbita alrededor del par.", CreateBinaryStarSystem())),
         new("Cinturón de asteroides", "Un sol central con miles de asteroides en órbita.", () => new GalaxyScene("Cinturón de asteroides", "Un sol central con miles de asteroides en órbita.", CreateAsteroidBeltSystem())),
         new("Anillo orbital", "Un sistema de anillo con satélites alrededor de una estrella central.", () => new GalaxyScene("Anillo orbital", "Un sistema de anillo con satélites alrededor de una estrella central.", CreateOrbitalRingSystem())),
-        new("Stress Quadtree 10000", "Escenario de estrés para Barnes-Hut con 10k cuerpos orbitando un núcleo.", () => new GalaxyScene("Stress Quadtree 10000", "Escenario de estrés para Barnes-Hut con 10k cuerpos orbitando un núcleo.", CreateQuadtreeStressSystem(2500))),
+        new("Stress Quadtree 10000", "Escenario de estrés para Barnes-Hut con 10k cuerpos orbitando un núcleo.", () => new GalaxyScene("Stress Quadtree 10000", "Escenario de estrés para Barnes-Hut con 10k cuerpos orbitando un núcleo.", CreateQuadtreeStressSystem(100000))),
         new("Colisión de galaxias", "Dos galaxias de 1000 cuerpos cada una en curso de choque directo.", () => new GalaxyScene("Colisión de galaxias", "Dos galaxias de 1000 cuerpos cada una en curso de choque directo.", CreateGalaxyCollisionSystem()))
     };
 
     public static List<Body> CreateTestGalaxy()
     {
         // === SISTEMA DE PRUEBA: 1 SOL + 4 PLANETAS EN ÓRBITA ===
-        //
-        // Los parámetros (posición, velocidad, masa) fueron ajustados empíricamente
-        // para que las órbitas sean visualmente claras y estables durante la simulación.
-        //
-        // Nota: Estas no son órbitas realistas (velocidades exageradas para visualización),
-        // pero demuestran bien la mecánica gravitatoria.
 
         return new List<Body>
         {
@@ -34,35 +28,46 @@ public static class GalaxyBuilder
                 velocity: Vector2.Zero,
                 mass: 4500000f,
                 radius: 50f,
-                color: new Color(255, 255, 0, 255)), // Amarillo para el sol
+                color: new Color(255, 255, 0, 255), // Amarillo para el sol
+                isStatic: true
+                ), 
+                
 
             new PlanetBody(
                 position: new Vector2(420f, 0f),
                 velocity: new Vector2(0f, 95f),
                 mass: 180f,
                 radius: 10f,
-                color: new Color(0, 0, 255, 255)), // Azul para el planeta principal
+                color: new Color(0, 0, 255, 255), // Azul para el planeta principal
+                isStatic: false
+                ), 
 
             new PlanetBody(
                 position: new Vector2(0f, 360f),
                 velocity: new Vector2(-100f, 0f),
                 mass: 140f,
                 radius: 8f,
-                color: new Color(0, 255, 0, 255)), // Verde para un planeta secundario
+                color: new Color(0, 255, 0, 255), // Verde para un planeta secundario
+                isStatic: false
+                ), 
 
             new PlanetBody(
                 position: new Vector2(-560f, 0f),
                 velocity: new Vector2(0f, -82f),
                 mass: 110f,
                 radius: 7f,
-                color: new Color(255, 0, 255, 255)), // Magenta para otro planeta
+                color: new Color(255, 0, 255, 255), // Magenta para otro planeta
+                isStatic: false
+                ), 
 
             new PlanetBody(
                 position: new Vector2(0f, -470f),
                 velocity: new Vector2(90f, 0f),
                 mass: 100f,
                 radius: 6f,
-                color: new Color(255, 165, 0, 255)) // Naranja para el cuarto planeta
+                color: new Color(255, 165, 0, 255), // Naranja para el cuarto planeta
+                isStatic: false
+                ) 
         };
     }
 
@@ -70,7 +75,50 @@ public static class GalaxyBuilder
     /// Crea una configuración de tres cuerpos pensada para exhibir un comportamiento caótico.
     /// </summary>
     /// 
-    public static List<Body> CreateChaoticThreeBodySystem()
+    /// <summary>
+    /// Configuración caótica equilibrada para Leapfrog (Momento total = 0, masas moderadas).
+    /// </summary>
+    public static List<Body> CreateChaoticThreeBodySystem1()
+    {
+        // Masas reducidas a 60,000 para evitar que la aceleración explote 
+        // cuando dos cuerpos pasan muy cerca con dt constante.
+        float mass = 80000f;
+
+        return new List<Body>
+    {
+        // Cuerpo 1 (Rojo) - Abajo Izquierda
+        new PlanetBody(
+            position: new Vector2(-280f, -150f),
+            velocity: new Vector2(30f, 45f),
+            mass: mass,
+            radius: 12f,
+            color: new Color(255, 110, 110, 255),
+            isStatic: false
+        ), 
+
+        // Cuerpo 2 (Verde) - Abajo Derecha
+        new PlanetBody(
+            position: new Vector2(280f, -150f),
+            velocity: new Vector2(-27f, 43f),
+            mass: mass,
+            radius: 12f,
+            color: new Color(110, 255, 150, 255),
+            isStatic: false
+        ), 
+
+        // Cuerpo 3 (Azul) - Arriba Centro
+        // Nota: (25 - 22 - 3 = 0) y (40 + 38 - 78 = 0) -> Momento neto cero
+        new PlanetBody(
+            position: new Vector2(0f, 300f),
+            velocity: new Vector2(-8f, -83f),
+            mass: mass,
+            radius: 12f,
+            color: new Color(110, 180, 255, 255),
+            isStatic: false
+        )
+    };
+    }
+    public static List<Body> CreateChaoticThreeBodySystem2()
     {
         // Las masas ahora son iguales y el triángulo inicial es más compacto.
         // Con eso los cuerpos se mantienen más “pegados” y se influencia entre sí de forma más visible.
@@ -84,21 +132,27 @@ public static class GalaxyBuilder
                 velocity: new Vector2(21f, 41f),
                 mass: 320000f,
                 radius: 14f,
-                color: new Color(255, 120, 120, 255)), // Cuerpo 1: rojo suave
+                color: new Color(255, 120, 120, 255),
+                isStatic: false
+                ), 
 
             new PlanetBody(
                 position: new Vector2(120f, -70f),
                 velocity: new Vector2(-19f, 39f),
                 mass: 320000f,
                 radius: 14f,
-                color: new Color(120, 255, 160, 255)), // Cuerpo 2: verde suave
+                color: new Color(120, 255, 160, 255),
+                isStatic: false
+                ), 
 
             new PlanetBody(
                 position: new Vector2(0f, 140f),
                 velocity: new Vector2(-2f, -80f),
                 mass: 320000f,
                 radius: 14f,
-                color: new Color(120, 180, 255, 255)) // Cuerpo 3: azul suave
+                color: new Color(120, 180, 255, 255),
+                isStatic: false
+                ) 
         };
     }
 
@@ -114,21 +168,27 @@ public static class GalaxyBuilder
                 velocity: new Vector2(0f, -55f),
                 mass: 1800000f,
                 radius: 24f,
-                color: new Color(255, 210, 120, 255)),
+                color: new Color(255, 210, 120, 255),
+                isStatic: false
+                ),
 
             new StarBody(
                 position: new Vector2(120f, 0f),
                 velocity: new Vector2(0f, 55f),
                 mass: 1800000f,
                 radius: 24f,
-                color: new Color(255, 160, 80, 255)),
+                color: new Color(255, 160, 80, 255),
+                isStatic: false
+                ),
 
             new PlanetBody(
                 position: new Vector2(0f, 380f),
                 velocity: new Vector2(-88f, 0f),
                 mass: 160f,
                 radius: 8f,
-                color: new Color(120, 190, 255, 255))
+                color: new Color(120, 190, 255, 255),
+                isStatic: false
+                )
         };
     }
 
@@ -144,7 +204,9 @@ public static class GalaxyBuilder
                 velocity: Vector2.Zero,
                 mass: 4000000f,
                 radius: 46f,
-                color: new Color(255, 240, 140, 255))
+                color: new Color(255, 240, 140, 255),
+                isStatic: true
+                )
         };
 
         // Cinturón con cuerpos pequeños a distintas distancias para dar variedad visual.
@@ -162,7 +224,8 @@ public static class GalaxyBuilder
                 velocity: tangent * speed,
                 mass: 18f + (i % 3) * 6f,
                 radius: 3.5f + (i % 3),
-                color: new Color((byte)(120 + (i * 7) % 100), (byte)(120 + (i * 13) % 100), (byte)(120 + (i * 17) % 100), (byte)255)));
+                color: new Color((byte)(120 + (i * 7) % 100), (byte)(120 + (i * 13) % 100), (byte)(120 + (i * 17) % 100), (byte)255),
+                isStatic: false));
         }
 
         return bodies;
@@ -180,7 +243,9 @@ public static class GalaxyBuilder
                 velocity: Vector2.Zero,
                 mass: 3000000f,
                 radius: 34f,
-                color: new Color(140, 220, 255, 255))
+                color: new Color(140, 220, 255, 255),
+                isStatic: true
+                )
         };
 
         for (int i = 0; i < 24; i++)
@@ -195,7 +260,9 @@ public static class GalaxyBuilder
                 velocity: tangent * (90f + (i % 4) * 8f),
                 mass: 90f,
                 radius: 5f + (i % 3),
-                color: new Color((byte)(180 + (i * 7) % 60), (byte)(120 + (i * 13) % 70), (byte)(220 - (i * 5) % 40), (byte)255)));
+                color: new Color((byte)(180 + (i * 7) % 60), (byte)(120 + (i * 13) % 70), (byte)(220 - (i * 5) % 40), (byte)255),
+                isStatic: false
+                ));
         }
 
         return bodies;
@@ -214,7 +281,9 @@ public static class GalaxyBuilder
                 velocity: Vector2.Zero,
                 mass: 12000000f,
                 radius: 56f,
-                color: new Color(255, 240, 120, 255))
+                color: new Color(255, 240, 120, 255),
+                isStatic: true
+                )
         };
 
         for (int i = 0; i < finalCount; i++)
@@ -235,7 +304,9 @@ public static class GalaxyBuilder
                 velocity: tangent * speed + radial * jitter,
                 mass: 8f + (float)random.NextDouble() * 24f,
                 radius: 1.6f + (float)random.NextDouble() * 2.6f,
-                color: new Color((byte)(120 + random.Next(120)), (byte)(120 + random.Next(120)), (byte)(120 + random.Next(120)), (byte)255)));
+                color: new Color((byte)(120 + random.Next(120)), (byte)(120 + random.Next(120)), (byte)(120 + random.Next(120)), (byte)255),
+                isStatic: false
+                ));
         }
 
         return bodies;
@@ -262,9 +333,10 @@ public static class GalaxyBuilder
             velocity: velG1,
             mass: 5000000f,
             radius: 48f,
-            color: new Color(255, 80, 80, 255))); // Tono anaranjado cálido
+            color: new Color(255, 80, 80, 255),
+            isStatic: false)); // Tono anaranjado cálido
 
-        for (int i = 0; i < 1200; i++)
+        for (int i = 0; i < 5000; i++)
         {
             float angle = (float)(random.NextDouble() * MathF.Tau);
             float radius = 100f + (float)random.NextDouble() * 600f; // Distribución del disco
@@ -279,7 +351,9 @@ public static class GalaxyBuilder
                 velocity: velG1 + (tangent * orbitalSpeed),
                 mass: 5f + (float)random.NextDouble() * 15f,
                 radius: 1.5f + (float)random.NextDouble() * 2f,
-                color: new Color((byte)(180 + random.Next(75)),(byte) 120, (byte)200, (byte)200)));
+                color: new Color((byte)(180 + random.Next(75)),(byte) 120, (byte)200, (byte)200),
+                isStatic: false
+                ));
         }
 
         // ==========================================
@@ -294,9 +368,11 @@ public static class GalaxyBuilder
             velocity: velG2,
             mass: 5000000f,
             radius: 48f,
-            color: new Color(100, 220, 255, 255))); // Tono azul brillante
+            color: new Color(100, 220, 255, 255),
+            isStatic: false
+            )); // Tono azul brillante
 
-        for (int i = 0; i < 1200; i++)
+        for (int i = 0; i < 5000; i++)
         {
             float angle = (float)(random.NextDouble() * MathF.Tau);
             float radius = 100f + (float)random.NextDouble() * 600f;
@@ -311,7 +387,9 @@ public static class GalaxyBuilder
                 velocity: velG2 + (tangent * orbitalSpeed),
                 mass: 5f + (float)random.NextDouble() * 15f,
                 radius: 1.5f + (float)random.NextDouble() * 2f,
-                color: new Color((byte)100, (byte)200, (byte)(180 + random.Next(75)), (byte)200)));
+                color: new Color((byte)100, (byte)200, (byte)(180 + random.Next(75)), (byte)200),
+                isStatic: false
+                ));
         }
 
         return bodies;

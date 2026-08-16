@@ -34,6 +34,7 @@ public class SimulationRepository
                 Mass REAL,
                 PosX REAL, PosY REAL,
                 VelX REAL, VelY REAL,
+                IsStatic BOOLEAN,
                 FOREIGN KEY(SimulationId) REFERENCES Simulations(Id)
             );";
             
@@ -87,6 +88,7 @@ public class SimulationRepository
             VelX = b.Velocity.X,
             VelY = b.Velocity.Y,
             Radius = b.Radius,
+            IsStatic = b.IsStatic,
             ColorR = b.Color.R,
             ColorG = b.Color.G,
             ColorB = b.Color.B,
@@ -94,8 +96,8 @@ public class SimulationRepository
         }).ToList();
 
         // 3. Guardamos todos los cuerpos de golpe (Dapper lo hace super rápido)
-        string insertBody = @"INSERT INTO Bodies (SimulationId, Mass, PosX, PosY, VelX, VelY, Radius, ColorR, ColorG, ColorB, ColorA) 
-                              VALUES (@SimulationId, @Mass, @PosX, @PosY, @VelX, @VelY, @Radius, @ColorR, @ColorG, @ColorB, @ColorA)";
+        string insertBody = @"INSERT INTO Bodies (SimulationId, Mass, PosX, PosY, VelX, VelY, Radius, IsStatic, ColorR, ColorG, ColorB, ColorA) 
+                              VALUES (@SimulationId, @Mass, @PosX, @PosY, @VelX, @VelY, @Radius, @IsStatic, @ColorR, @ColorG, @ColorB, @ColorA)";
         connection.Execute(insertBody, bodyRecords, tx);
 
         tx.Commit();
@@ -120,7 +122,8 @@ public class SimulationRepository
                 record.Mass,
                 record.Radius,
                 new Color(record.ColorR, record.ColorG, record.ColorB, record.ColorA),
-                BodyKind.Generic
+                BodyKind.Generic,
+                record.IsStatic
             );
             bodies.Add(body);
         }

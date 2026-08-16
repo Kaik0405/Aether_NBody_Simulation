@@ -21,6 +21,7 @@ public sealed class BodyRecord
     public float VelX { get; set; }
     public float VelY { get; set; }
     public float Radius { get; set; }
+    public bool IsStatic { get; set; }
 
     public byte ColorR { get; set; }
     public byte ColorG { get; set; }

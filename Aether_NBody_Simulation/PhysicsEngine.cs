@@ -37,7 +37,7 @@ public sealed class PhysicsEngine
     public void Update(List<Body> bodies, float dt)
     {
         // RK4 usa varias evaluaciones de aceleración por paso; el solver elegido decide cómo se calculan.
-        StepRK4(bodies, dt);
+        StepLeapfrog(bodies, dt);
 
         if (!RecordTrails)
         {
@@ -110,6 +110,59 @@ public sealed class PhysicsEngine
             bodies[i].Acceleration = k4Velocity[i];
         }
     }
+    private void StepLeapfrog(List<Body> bodies, float dt)
+    {
+        int n = bodies.Count;
+        if (n == 0 || dt <= 0f) return;
+
+        float halfDt = dt * 0.5f;
+
+        // ------------------------------------------------------------------
+        // FASE 1 y 2: Actualizar Velocidad y Posición (Solo móviles)
+        // ------------------------------------------------------------------
+        for (int i = 0; i < n; i++)
+        {
+            var body = bodies[i];
+
+            // Si el cuerpo es estático, no se desplaza
+            if (body.IsStatic) continue;
+
+            body.Velocity += body.Acceleration * halfDt;
+            body.Position += body.Velocity * dt;
+        }
+
+        // ------------------------------------------------------------------
+        // FASE 3: Recalcular Aceleraciones
+        // (TODOS los cuerpos, incluidos los estáticos, entran aquí para 
+        // ser insertados en el QuadTree y atraer a los demás)
+        // ------------------------------------------------------------------
+        var positions = new Vector2[n];
+        for (int i = 0; i < n; i++)
+        {
+            positions[i] = bodies[i].Position;
+        }
+
+        Vector2[] newAccelerations = CalculateAccelerations(positions, bodies);
+
+        // ------------------------------------------------------------------
+        // FASE 4: Aplicar la nueva aceleración (Solo móviles)
+        // ------------------------------------------------------------------
+        for (int i = 0; i < n; i++)
+        {
+            var body = bodies[i];
+
+            if (body.IsStatic)
+            {
+                // Forzamos aceleración y velocidad a cero para que permanezca inmóvil
+                body.Acceleration = Vector2.Zero;
+                body.Velocity = Vector2.Zero;
+                continue;
+            }
+
+            body.Acceleration = newAccelerations[i];
+            body.Velocity += body.Acceleration * halfDt;
+        }
+    }
 
     private Vector2[] CalculateAccelerations(Vector2[] positions, List<Body> bodies)
     {
@@ -167,10 +220,10 @@ public sealed class PhysicsEngine
             return accelerations;
         }
 
-        for (int i = 0; i < n; i++)
+        Parallel.For(0, n, i =>
         {
             accelerations[i] = GetAccelerationFromTree(positions[i], i, quadTreeRoot);
-        }
+        });
 
         return accelerations;
     }
