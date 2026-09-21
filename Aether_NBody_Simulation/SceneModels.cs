@@ -12,6 +12,8 @@ public enum BodyKind
     Star,
     Planet,
     BlackHole,
+    Quasar,
+    Pulsar,
     Asteroid
 }
 

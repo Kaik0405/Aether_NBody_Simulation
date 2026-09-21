@@ -36,8 +36,10 @@ public sealed class PhysicsEngine
 
     public void Update(List<Body> bodies, float dt)
     {
-        // RK4 usa varias evaluaciones de aceleración por paso; el solver elegido decide cómo se calculan.
+        // Leapfrog mantiene separadas las actualizaciones de velocidad, posición y aceleración.
         StepLeapfrog(bodies, dt);
+        UpdateBlackHoleEffects(bodies, dt);
+        UpdateVisualAnimations(bodies, dt);
 
         if (!RecordTrails)
         {
@@ -125,7 +127,7 @@ public sealed class PhysicsEngine
             var body = bodies[i];
 
             // Si el cuerpo es estático, no se desplaza
-            if (body.IsStatic) continue;
+            if (body.IsStatic || body.IsConsumed) continue;
 
             body.Velocity += body.Acceleration * halfDt;
             body.Position += body.Velocity * dt;
@@ -151,7 +153,7 @@ public sealed class PhysicsEngine
         {
             var body = bodies[i];
 
-            if (body.IsStatic)
+            if (body.IsStatic || body.IsConsumed)
             {
                 // Forzamos aceleración y velocidad a cero para que permanezca inmóvil
                 body.Acceleration = Vector2.Zero;
@@ -161,6 +163,91 @@ public sealed class PhysicsEngine
 
             body.Acceleration = newAccelerations[i];
             body.Velocity += body.Acceleration * halfDt;
+        }
+    }
+
+    private static void UpdateBlackHoleEffects(List<Body> bodies, float dt)
+    {
+        var blackHoles = bodies.OfType<BlackHoleBody>().Where(body => !body.IsConsumed).ToList();
+        if (blackHoles.Count == 0)
+        {
+            return;
+        }
+
+        foreach (Body body in bodies)
+        {
+            if (body.IsConsumed || body is BlackHoleBody)
+            {
+                continue;
+            }
+
+            BlackHoleBody? nearest = null;
+            float nearestDistance = float.MaxValue;
+            foreach (BlackHoleBody blackHole in blackHoles)
+            {
+                float distance = Vector2.Distance(body.Position, blackHole.Position);
+                if (distance < nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearest = blackHole;
+                }
+            }
+
+            if (nearest is null || nearestDistance > nearest.TidalRadius)
+            {
+                body.IsBeingAbsorbed = false;
+                body.AbsorptionProgress = 0f;
+                body.AbsorptionDirection = Vector2.Zero;
+                body.IsPixelating = false;
+                body.PixelationProgress = 0f;
+                body.Radius = body.OriginalRadius;
+                continue;
+            }
+
+            Vector2 direction = nearest.Position - body.Position;
+            body.AbsorptionDirection = direction.LengthSquared() > 0.0001f
+                ? Vector2.Normalize(direction)
+                : Vector2.UnitX;
+            body.IsBeingAbsorbed = true;
+
+            float tidalRange = MathF.Max(nearest.TidalRadius, nearest.EventHorizonRadius + 1f);
+            float normalizedDistance = Math.Clamp(
+                (nearestDistance - nearest.EventHorizonRadius) / (tidalRange - nearest.EventHorizonRadius),
+                0f,
+                1f);
+            body.AbsorptionProgress = 1f - normalizedDistance;
+
+            // La marea alarga el cuerpo en la dirección del agujero y reduce su radio transversal.
+            body.Radius = MathF.Max(0.15f, body.OriginalRadius * (1f - body.AbsorptionProgress * 0.78f));
+
+            if (nearestDistance <= nearest.EventHorizonRadius)
+            {
+                body.IsPixelating = true;
+                body.PixelationProgress = Math.Clamp(body.PixelationProgress + dt * 1.8f, 0f, 1f);
+                body.Radius = MathF.Max(0.1f, body.Radius * (1f - body.PixelationProgress * 0.65f));
+
+                if (body.PixelationProgress >= 1f)
+                {
+                    body.IsConsumed = true;
+                    body.Mass = 0f;
+                    body.Radius = 0f;
+                }
+            }
+        }
+    }
+
+    private static void UpdateVisualAnimations(List<Body> bodies, float dt)
+    {
+        foreach (Body body in bodies)
+        {
+            if (body is PulsarBody pulsar)
+            {
+                pulsar.VisualRotation += pulsar.SpinSpeed * dt;
+            }
+            else if (body is QuasarBody quasar)
+            {
+                quasar.VisualRotation += 0.35f * dt;
+            }
         }
     }
 

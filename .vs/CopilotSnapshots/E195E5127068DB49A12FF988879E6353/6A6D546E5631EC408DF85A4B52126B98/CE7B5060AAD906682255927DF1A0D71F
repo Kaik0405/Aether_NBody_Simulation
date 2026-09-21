@@ -5,6 +5,11 @@ using Raylib_cs;
 
 const int initialWindowWidth = 1820;
 const int initialWindowHeight = 980;
+Matrix4x4[] transforms;
+Mesh circleMesh;
+Material material;
+Shader instancedShader;
+Texture2D colorTexture;
 
 var cliArgs = Environment.GetCommandLineArgs().Skip(1).ToHashSet(StringComparer.OrdinalIgnoreCase);
 if (cliArgs.Contains("--benchmark-quadtree"))
@@ -426,142 +431,63 @@ static void UpdateCamera(ref Camera2D camera, int screenWidth, int screenHeight)
 
 static void DrawBodies(List<Body> bodies, Camera2D camera)
 {
-    // Todo lo dibujado aquí se ve afectado por la cámara y su zoom.
+    // 1. Actualizamos los datos matemáticos en la CPU (esto es rápido)
+    for (int i = 0; i < bodies.Count; i++)
+    {
+        var body = bodies[i];
+
+        Matrix4x4 scale = Matrix4x4.CreateScale(body.Radius, body.Radius, 1f);
+        Matrix4x4 translation = Matrix4x4.CreateTranslation(body.Position.X, body.Position.Y, 0f);
+
+        Program.transforms[i] = scale * translation;
+    }
+
+    // 2. Renderizado en la GPU
     Raylib.BeginMode2D(camera);
 
-    foreach (var body in bodies)
-    {
-        DrawBodyVisual(body);
-    }
+    // Mandamos el arreglo actualizado y la gráfica hace el resto
+    Raylib.DrawMeshInstanced(Program.circleMesh, Program.material, Program.transforms, bodies.Count);
 
     Raylib.EndMode2D();
 }
 
-static void DrawBodyVisual(Body body)
+// Llama a este método UNA VEZ, después de generar tu lista de 'bodies' inicial
+static void InitRenderer(List<Body> bodies)
 {
-    if (body.IsConsumed)
+    // 1. Instanciar el arreglo 1 sola vez
+    transforms = new Matrix4x4[bodies.Count];
+
+    // 2. Crear la malla base 1 sola vez
+    circleMesh = Raylib.GenMeshPoly(16, 1.0f);
+
+    // 3. Crear la textura de colores
+    int texWidth = 256;
+    Image colorImage = Raylib.GenImageColor(texWidth, texWidth, Color.Blank);
+
+    for (int i = 0; i < bodies.Count; i++)
     {
-        return;
+        int px = i % texWidth;
+        int py = i / texWidth;
+        // Pintamos cada píxel con el color de su respectivo cuerpo
+        Raylib.ImageDrawPixel(ref colorImage, px, py, bodies[i].Color);
     }
 
-    if (body is QuasarBody quasar)
-    {
-        DrawQuasar(quasar);
-        return;
-    }
+    // Subir textura a la gráfica y limpiar la imagen de la RAM
+    colorTexture = Raylib.LoadTextureFromImage(colorImage);
+    Raylib.UnloadImage(colorImage);
+    Raylib.SetTextureFilter(colorTexture, TextureFilter.Point);
 
-    if (body is BlackHoleBody blackHole)
-    {
-        DrawBlackHole(blackHole);
-        return;
-    }
+    // 4. Cargar Shaders
+    instancedShader = Raylib.LoadShader("instanced.vs", "instanced.fs");
+    int mapWidthLoc = Raylib.GetShaderLocation(instancedShader, "mapWidth");
+    Raylib.SetShaderValue(instancedShader, mapWidthLoc, texWidth, ShaderUniformDataType.Int);
 
-    if (body is PulsarBody pulsar)
-    {
-        DrawPulsar(pulsar);
-        return;
-    }
+    // 5. Preparar el material
+    material = Raylib.LoadMaterialDefault();
+    material.Shader = instancedShader;
 
-    if (body.IsBeingAbsorbed)
-    {
-        DrawSpaghettifiedBody(body);
-    }
-    else
-    {
-        Raylib.DrawCircleV(body.Position, body.Radius, body.Color);
-    }
-
-    if (body.IsPixelating)
-    {
-        DrawPixelation(body);
-    }
-}
-
-static void DrawBlackHole(BlackHoleBody blackHole)
-{
-    // El disco y el anillo luminoso crean una silueta 2D inspirada en Gargantua.
-    Raylib.DrawCircleV(blackHole.Position, blackHole.Radius * 1.8f, new Color(255, 110, 35, 35));
-    Raylib.DrawCircleV(blackHole.Position, blackHole.Radius * 1.35f, new Color(255, 190, 70, 80));
-    Raylib.DrawCircleV(blackHole.Position, blackHole.Radius, new Color(4, 4, 10, 255));
-    Raylib.DrawCircleLines((int)blackHole.Position.X, (int)blackHole.Position.Y, blackHole.Radius * 1.35f, new Color(255, 210, 120, 180));
-}
-
-static void DrawQuasar(QuasarBody quasar)
-{
-    // Un cuásar se distingue por su disco de acreción, no por los triángulos de un púlsar.
-    Raylib.DrawEllipseV(quasar.Position, quasar.Radius * 3.2f, quasar.Radius * 0.9f, new Color(255, 95, 25, 45));
-    Raylib.DrawEllipseLinesV(quasar.Position, quasar.Radius * 2.5f, quasar.Radius * 0.65f, new Color(255, 180, 60, 190));
-    Raylib.DrawEllipseLinesV(quasar.Position, quasar.Radius * 1.8f, quasar.Radius * 0.45f, new Color(255, 235, 150, 230));
-    DrawBlackHole(quasar);
-
-    // Los jets del cuásar son haces estrechos y casi rectos, con brillo decreciente.
-    Vector2 axis = Vector2.UnitY;
-    DrawQuasarJet(quasar.Position - axis * quasar.Radius, axis, quasar.JetLength, quasar.JetWidth);
-    DrawQuasarJet(quasar.Position + axis * quasar.Radius, axis * -1f, quasar.JetLength, quasar.JetWidth);
-}
-
-static void DrawQuasarJet(Vector2 origin, Vector2 direction, float length, float width)
-{
-    const int segments = 5;
-    for (int i = 0; i < segments; i++)
-    {
-        float start = i / (float)segments;
-        float end = (i + 1) / (float)segments;
-        Vector2 segmentStart = origin + direction * (length * start);
-        Vector2 segmentEnd = origin + direction * (length * end);
-        float segmentWidth = MathF.Max(1f, width * (1f - start * 0.8f));
-        byte alpha = (byte)(190f * (1f - start * 0.55f));
-        Raylib.DrawLineEx(segmentStart, segmentEnd, segmentWidth, new Color((byte)120, (byte)205, (byte)255, alpha));
-    }
-}
-
-static void DrawPulsar(PulsarBody pulsar)
-{
-    Raylib.DrawCircleV(pulsar.Position, pulsar.Radius * 1.35f, new Color(100, 190, 255, 45));
-    Raylib.DrawCircleV(pulsar.Position, pulsar.Radius, pulsar.Color);
-
-    Vector2 axis = new(MathF.Cos(pulsar.VisualRotation), MathF.Sin(pulsar.VisualRotation));
-    Vector2 side = new(-axis.Y, axis.X);
-    DrawPulsarJet(pulsar.Position + axis * pulsar.Radius, axis, pulsar.JetLength, pulsar.Radius * 0.7f, new Color(120, 220, 255, 180));
-    DrawPulsarJet(pulsar.Position - axis * pulsar.Radius, axis * -1f, pulsar.JetLength, pulsar.Radius * 0.7f, new Color(120, 220, 255, 180));
-    Raylib.DrawLineEx(pulsar.Position - side * pulsar.Radius, pulsar.Position + side * pulsar.Radius, 2f, new Color(255, 255, 255, 255));
-}
-
-static void DrawPulsarJet(Vector2 origin, Vector2 direction, float length, float width, Color color)
-{
-    Vector2 end = origin + direction * length;
-    Vector2 side = new Vector2(-direction.Y, direction.X) * width;
-    Raylib.DrawTriangle(origin, end + side, end - side, color);
-    Raylib.DrawLineEx(origin, end, MathF.Max(1f, width * 0.18f), new Color(220, 245, 255, 220));
-}
-
-static void DrawSpaghettifiedBody(Body body)
-{
-    Vector2 direction = body.AbsorptionDirection.LengthSquared() > 0.0001f
-        ? Vector2.Normalize(body.AbsorptionDirection)
-        : Vector2.UnitX;
-    Vector2 tailStart = body.Position - direction * body.Radius;
-    float tailLength = body.OriginalRadius * (1.5f + body.AbsorptionProgress * 9f);
-    Vector2 tailEnd = tailStart - direction * tailLength;
-    float tailWidth = MathF.Max(1f, body.Radius * (1f - body.AbsorptionProgress * 0.65f));
-
-    Raylib.DrawLineEx(tailStart, tailEnd, tailWidth, new Color(body.Color.R, body.Color.G, body.Color.B, (byte)100));
-    Raylib.DrawLineEx(tailStart, tailEnd, MathF.Max(1f, tailWidth * 0.35f), body.Color);
-    Raylib.DrawCircleV(body.Position, body.Radius, body.Color);
-}
-
-static void DrawPixelation(Body body)
-{
-    // Los bloques crecen y se separan para sugerir que el cuerpo cruza el horizonte.
-    int count = 3 + (int)(body.PixelationProgress * 8f);
-    for (int i = 0; i < count; i++)
-    {
-        float angle = i * 2.39996f + body.VisualRotation;
-        float distance = body.Radius * (1.5f + i * 0.55f);
-        Vector2 position = body.Position + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * distance;
-        float size = MathF.Max(1f, body.Radius * 0.35f);
-        Raylib.DrawRectangleV(position, new Vector2(size, size), new Color(body.Color.R, body.Color.G, body.Color.B, (byte)255));
-    }
+    // Vinculamos la textura al material (según tu versión de Raylib_cs, esta es la forma segura)
+    Raylib.SetMaterialTexture(ref material, MaterialMapIndex.Albedo, colorTexture);
 }
 
 static void DrawUiPanel(
