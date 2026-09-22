@@ -71,6 +71,15 @@ public class Body
     /// <summary>Ángulo usado por las animaciones de rotación de pulsares y discos.</summary>
     public float VisualRotation { get; set; }
 
+    /// <summary>Edad interna usada por la evolución estelar acelerada.</summary>
+    public float Age { get; set; }
+
+    /// <summary>Duración de vida aproximada en unidades de simulación.</summary>
+    public float Lifetime { get; set; } = float.PositiveInfinity;
+
+    /// <summary>Evita que una estrella evolucione varias veces durante el mismo paso.</summary>
+    public bool HasEvolved { get; set; }
+
     /// <summary>Inicializa un cuerpo con los datos base.</summary>
     public Body(Vector2 position, Vector2 velocity, float mass, float radius, Color color, BodyKind kind, bool isStatic)
     {
@@ -122,6 +131,8 @@ public sealed class StarBody : Body
     public StarBody(Vector2 position, Vector2 velocity, float mass, float radius, Color color,bool isStatic)
         : base(position, velocity, mass, radius, color, BodyKind.Star,isStatic)
     {
+        // Las estrellas masivas evolucionan antes y terminan como agujeros negros; las demás como pulsares.
+        Lifetime = mass >= 2200f ? 900f : 1500f;
     }
 
     public override Body CloneBody()
@@ -136,7 +147,10 @@ public sealed class StarBody : Body
             IsPixelating = IsPixelating,
             PixelationProgress = PixelationProgress,
             IsConsumed = IsConsumed,
-            VisualRotation = VisualRotation
+            VisualRotation = VisualRotation,
+            Age = Age,
+            Lifetime = Lifetime,
+            HasEvolved = HasEvolved
         };
     }
 }
@@ -161,7 +175,10 @@ public sealed class PlanetBody : Body
             IsPixelating = IsPixelating,
             PixelationProgress = PixelationProgress,
             IsConsumed = IsConsumed,
-            VisualRotation = VisualRotation
+            VisualRotation = VisualRotation,
+            Age = Age,
+            Lifetime = Lifetime,
+            HasEvolved = HasEvolved
         };
     }
 }
@@ -194,7 +211,10 @@ public class BlackHoleBody : Body
             IsPixelating = IsPixelating,
             PixelationProgress = PixelationProgress,
             IsConsumed = IsConsumed,
-            VisualRotation = VisualRotation
+            VisualRotation = VisualRotation,
+            Age = Age,
+            Lifetime = Lifetime,
+            HasEvolved = HasEvolved
         };
     }
 }
@@ -231,7 +251,10 @@ public sealed class QuasarBody : BlackHoleBody
             IsPixelating = IsPixelating,
             PixelationProgress = PixelationProgress,
             IsConsumed = IsConsumed,
-            VisualRotation = VisualRotation
+            VisualRotation = VisualRotation,
+            Age = Age,
+            Lifetime = Lifetime,
+            HasEvolved = HasEvolved
         };
     }
 }
@@ -261,7 +284,10 @@ public sealed class PulsarBody : Body
             IsPixelating = IsPixelating,
             PixelationProgress = PixelationProgress,
             IsConsumed = IsConsumed,
-            VisualRotation = VisualRotation
+            VisualRotation = VisualRotation,
+            Age = Age,
+            Lifetime = Lifetime,
+            HasEvolved = HasEvolved
         };
     }
 }

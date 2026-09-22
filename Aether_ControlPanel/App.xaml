@@ -1,0 +1,34 @@
+<Application x:Class="Aether_ControlPanel.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <SolidColorBrush x:Key="PanelBrush" Color="#18202B" />
+        <SolidColorBrush x:Key="CardBrush" Color="#222D3A" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#59B7FF" />
+        <Style TargetType="GroupBox">
+            <Setter Property="Foreground" Value="#D8E8F5" />
+            <Setter Property="BorderBrush" Value="#30465A" />
+            <Setter Property="Background" Value="#18202B" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Foreground" Value="#EAF4FF" />
+            <Setter Property="Background" Value="#263B4D" />
+            <Setter Property="BorderBrush" Value="#47718D" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="Margin" Value="0,3,0,3" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Foreground" Value="#EAF4FF" />
+            <Setter Property="Background" Value="#111A23" />
+            <Setter Property="BorderBrush" Value="#3B596E" />
+            <Setter Property="Padding" Value="5,3" />
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Foreground" Value="#12202B" />
+            <Setter Property="Background" Value="#EAF4FF" />
+            <Setter Property="Margin" Value="0,3,0,3" />
+        </Style>
+    </Application.Resources>
+</Application>

@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="Aether_NBody_Simulation/Aether_NBody_Simulation.csproj" />
+  <Project Path="Aether_ControlPanel/Aether_ControlPanel.csproj" />
 </Solution>

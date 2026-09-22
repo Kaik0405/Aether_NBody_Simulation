@@ -13,13 +13,24 @@ if (cliArgs.Contains("--benchmark-quadtree"))
     return;
 }
 
+bool externalUi = cliArgs.Contains("--external-ui");
+bool hosted = cliArgs.Contains("--hosted");
+if (!externalUi && !cliArgs.Contains("--embedded-ui"))
+{
+    LaunchExternalControlPanel();
+    return;
+}
+
 // Enable window resizing so maximize/fullscreen work naturally.
 Raylib.SetConfigFlags((ConfigFlags)4);
 Raylib.InitWindow(initialWindowWidth, initialWindowHeight, "Aether N-Body Simulation");
 Raylib.SetTargetFPS(60);
 
-// Start maximized to use the available screen space immediately.
-Raylib.MaximizeWindow();
+// Standalone mode maximizes; hosted mode is resized by the WPF parent window.
+if (!hosted)
+{
+    Raylib.MaximizeWindow();
+}
 
 // Servicios principales: almacenamiento, catálogo de escenas y motor físico.
 var repository = new SimulationRepository();
@@ -29,6 +40,7 @@ var physicsEngine = new PhysicsEngine
     SolverMode = PhysicsSolverMode.Quadtree,
     RecordTrails = false
 };
+using var controlPipe = externalUi ? new ControlPipeServer() : null;
 
 // Cámara 2D usada para navegar por la simulación con zoom y desplazamiento.
 var camera = new Camera2D
@@ -42,8 +54,10 @@ var camera = new Camera2D
 // Estado de la aplicación: escena activa, cuerpos actuales, estados guardados y mensajes de UI.
 int selectedSceneIndex = 0;
 var bodies = CreateBodiesForScene(scenes[selectedSceneIndex]);
+FrameBodies(ref camera, bodies, initialWindowWidth, initialWindowHeight);
 var savedSimulations = repository.GetSimulations();
 int selectedSaveId = savedSimulations.FirstOrDefault()?.Id ?? -1;
+int selectedBodyIndex = -1;
 bool paused = false;
 bool editingSaveName = false;
 string statusMessage = "Select a scene, edit a name, and save.";
@@ -63,9 +77,26 @@ try
             physicsEngine.Update(bodies, dt);
         }
 
+        if (externalUi)
+        {
+            ProcessExternalCommands(
+                controlPipe!,
+                scenes,
+                ref selectedSceneIndex,
+                ref bodies,
+                ref paused,
+                ref selectedBodyIndex,
+                physicsEngine,
+                ref camera,
+                screenWidth,
+                screenHeight);
+        }
+
         // El movimiento de cámara y la interacción con la interfaz se procesan por separado para mantener el flujo claro.
         UpdateCamera(ref camera, screenWidth, screenHeight);
-        HandleUiInput(
+        if (!externalUi)
+        {
+            HandleUiInput(
             scenes,
             ref selectedSceneIndex,
             ref bodies,
@@ -74,27 +105,36 @@ try
             ref editingSaveName,
             ref statusMessage,
             ref saveName,
+            ref selectedBodyIndex,
+            physicsEngine,
             repository,
             ref savedSimulations,
             ref camera,
             screenWidth,
             screenHeight);
+        }
 
         // Se limpia y vuelve a dibujar el frame completo en cada iteración.
         Raylib.BeginDrawing();
         Raylib.ClearBackground(new Color(0, 0, 0, 255));
 
-        DrawBodies(bodies, camera);
-        DrawUiPanel(
+        DrawBodies(bodies, camera, screenWidth, screenHeight);
+        if (!externalUi)
+        {
+            DrawUiPanel(
             scenes,
             selectedSceneIndex,
+            bodies,
             savedSimulations,
             selectedSaveId,
+            selectedBodyIndex,
+            physicsEngine.SimulationSpeed,
             editingSaveName,
             statusMessage,
             saveName,
             screenWidth,
             screenHeight);
+        }
 
         Raylib.EndDrawing();
     }
@@ -103,6 +143,108 @@ finally
 {
     // Clean shutdown to release Raylib native resources.
     Raylib.CloseWindow();
+}
+
+static void ProcessExternalCommands(
+    ControlPipeServer pipe,
+    IReadOnlyList<GalaxyBuilder.SceneDefinition> scenes,
+    ref int selectedSceneIndex,
+    ref List<Body> bodies,
+    ref bool paused,
+    ref int selectedBodyIndex,
+    PhysicsEngine physicsEngine,
+    ref Camera2D camera,
+    int screenWidth,
+    int screenHeight)
+{
+    while (pipe.TryDequeue(out SimulationCommand? command) && command is not null)
+    {
+        switch (command.Name.ToLowerInvariant())
+        {
+            case "pause":
+                paused = !paused;
+                break;
+            case "speed" when command.Arguments.Length > 0
+                && float.TryParse(command.Arguments[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float speed):
+                physicsEngine.SimulationSpeed = Math.Clamp(speed, 0.125f, 32f);
+                break;
+            case "scene" when command.Arguments.Length > 0:
+                int sceneIndex = Enumerable.Range(0, scenes.Count).FirstOrDefault(index => scenes[index].Name.Contains(command.Arguments[0], StringComparison.OrdinalIgnoreCase), -1);
+                if (sceneIndex >= 0)
+                {
+                    selectedSceneIndex = sceneIndex;
+                    bodies = CreateBodiesForScene(scenes[sceneIndex]);
+                    selectedBodyIndex = -1;
+                    FrameBodies(ref camera, bodies, screenWidth, screenHeight);
+                }
+                break;
+            case "spawn" when command.Arguments.Length >= 6:
+                if (TryCreateExternalBody(command.Arguments, out Body? spawned))
+                {
+                    bodies.Add(spawned!);
+                    selectedBodyIndex = bodies.Count - 1;
+                }
+                break;
+            case "select" when command.Arguments.Length >= 2
+                && float.TryParse(command.Arguments[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float selectX)
+                && float.TryParse(command.Arguments[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float selectY):
+                selectedBodyIndex = FindBodyAtPoint(bodies, new Vector2(selectX, selectY));
+                WriteSelectionInfo(bodies, selectedBodyIndex);
+                break;
+            case "delete-selected" when selectedBodyIndex >= 0 && selectedBodyIndex < bodies.Count:
+                bodies.RemoveAt(selectedBodyIndex);
+                selectedBodyIndex = -1;
+                break;
+        }
+    }
+}
+
+static void LaunchExternalControlPanel()
+{
+    string root = Directory.GetParent(AppContext.BaseDirectory)?.Parent?.Parent?.Parent?.Parent?.FullName
+        ?? Environment.CurrentDirectory;
+    string panelProject = Path.Combine(root, "Aether_ControlPanel", "Aether_ControlPanel.csproj");
+
+    Process.Start(new ProcessStartInfo
+    {
+        FileName = "dotnet",
+        Arguments = $"run --project \"{panelProject}\"",
+        WorkingDirectory = root,
+        UseShellExecute = false,
+        CreateNoWindow = false
+    });
+}
+
+static bool TryCreateExternalBody(string[] arguments, out Body? body)
+{
+    body = null;
+    if (!float.TryParse(arguments[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float mass)
+        || !float.TryParse(arguments[3], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float radius)
+        || !float.TryParse(arguments[4], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float x)
+        || !float.TryParse(arguments[5], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float y))
+    {
+        return false;
+    }
+
+    Vector2 position = new(x, y);
+    body = arguments[1].ToLowerInvariant() switch
+    {
+        "star" => new StarBody(position, Vector2.Zero, MathF.Max(1000f, mass), MathF.Max(5f, radius), new Color(255, 210, 100, 255), false),
+        "blackhole" => new BlackHoleBody(position, Vector2.Zero, MathF.Max(100000f, mass), MathF.Max(15f, radius), new Color(8, 8, 14, 255), false),
+        "pulsar" => new PulsarBody(position, Vector2.Zero, MathF.Max(100000f, mass), MathF.Max(8f, radius), new Color(150, 220, 255, 255), false),
+        "quasar" => new QuasarBody(position, Vector2.Zero, MathF.Max(9000000f, mass), MathF.Max(30f, radius), new Color(255, 160, 70, 255), false),
+        _ => new PlanetBody(position, Vector2.Zero, MathF.Max(1f, mass), MathF.Max(1f, radius), new Color(120, 190, 255, 255), false)
+    };
+
+    return true;
+}
+
+static void WriteSelectionInfo(IReadOnlyList<Body> bodies, int selectedBodyIndex)
+{
+    string text = selectedBodyIndex >= 0 && selectedBodyIndex < bodies.Count
+        ? $"Selected: {bodies[selectedBodyIndex].TypeName}\nMass: {bodies[selectedBodyIndex].Mass:0.##}\nRadius: {bodies[selectedBodyIndex].Radius:0.##}\nVelocity: {bodies[selectedBodyIndex].Velocity.Length():0.##}\nPosition: {bodies[selectedBodyIndex].Position}"
+        : "No body selected";
+    File.WriteAllText("aether.selection", text);
 }
 
 // Se clona la escena para que la simulación no modifique la definición original.
@@ -132,9 +274,37 @@ static void SwitchScene(
     saveName = scenes[index].Name;
     statusMessage = $"Active scene: {scenes[index].Name}";
 
-    // Recenter the camera so the newly loaded scene is immediately visible.
-    camera.Target = Vector2.Zero;
-    camera.Zoom = 1f;
+    // Las escenas pequeñas se centran; el universo de varias galaxias se encuadra completo.
+    if (scenes[index].Name.Contains("Fase", StringComparison.OrdinalIgnoreCase))
+    {
+        FrameBodies(ref camera, bodies, Raylib.GetScreenWidth(), Raylib.GetScreenHeight());
+    }
+    else
+    {
+        camera.Target = Vector2.Zero;
+        camera.Zoom = 1f;
+    }
+}
+
+static void FrameBodies(ref Camera2D camera, IReadOnlyList<Body> bodies, int screenWidth, int screenHeight)
+{
+    if (bodies.Count == 0)
+    {
+        return;
+    }
+
+    float minX = bodies.Min(body => body.Position.X);
+    float maxX = bodies.Max(body => body.Position.X);
+    float minY = bodies.Min(body => body.Position.Y);
+    float maxY = bodies.Max(body => body.Position.Y);
+    Vector2 center = new((minX + maxX) * 0.5f, (minY + maxY) * 0.5f);
+    float worldWidth = MathF.Max(1f, maxX - minX);
+    float worldHeight = MathF.Max(1f, maxY - minY);
+    float zoomX = screenWidth * 0.72f / worldWidth;
+    float zoomY = screenHeight * 0.72f / worldHeight;
+
+    camera.Target = center;
+    camera.Zoom = Math.Clamp(MathF.Min(zoomX, zoomY), 0.02f, 1f);
 }
 
 static void HandleUiInput(
@@ -146,6 +316,8 @@ static void HandleUiInput(
     ref bool editingSaveName,
     ref string statusMessage,
     ref string saveName,
+    ref int selectedBodyIndex,
+    PhysicsEngine physicsEngine,
     SimulationRepository repository,
     ref List<SimulationRecord> savedSimulations,
     ref Camera2D camera,
@@ -194,6 +366,18 @@ static void HandleUiInput(
         camera.Target = Vector2.Zero;
         camera.Zoom = 1f;
         statusMessage = "Camera reset";
+    }
+
+    // +/- cambia la velocidad de la simulación sin modificar la velocidad física base.
+    if (Raylib.IsKeyPressed((KeyboardKey)61))
+    {
+        physicsEngine.SimulationSpeed = MathF.Min(32f, physicsEngine.SimulationSpeed * 2f);
+        statusMessage = $"Simulation speed: {physicsEngine.SimulationSpeed:0.##}x";
+    }
+    if (Raylib.IsKeyPressed((KeyboardKey)45))
+    {
+        physicsEngine.SimulationSpeed = MathF.Max(0.125f, physicsEngine.SimulationSpeed * 0.5f);
+        statusMessage = $"Simulation speed: {physicsEngine.SimulationSpeed:0.###}x";
     }
 
     // Si el campo de texto está activo, se capturan las teclas para editar el nombre del estado guardado.
@@ -257,7 +441,18 @@ static void HandleUiInput(
 
         if (!clickedUiElement)
         {
-            editingSaveName = false;
+            // Un clic sobre un cuerpo lo selecciona para las acciones de edición de fase 3.
+            Vector2 worldMouse = Raylib.GetScreenToWorld2D(mouse, camera);
+            selectedBodyIndex = FindBodyAtPoint(bodies, worldMouse);
+            clickedUiElement = selectedBodyIndex >= 0;
+            if (clickedUiElement)
+            {
+                statusMessage = $"Selected body: {bodies[selectedBodyIndex].TypeName}";
+            }
+            else
+            {
+                editingSaveName = false;
+            }
         }
     }
 
@@ -265,6 +460,83 @@ static void HandleUiInput(
     {
         DeleteSelectedSimulation(savedSimulations, selectedSaveId, repository, ref savedSimulations, ref selectedSaveId, ref statusMessage);
     }
+
+    if (Raylib.IsKeyPressed(KeyboardKey.N))
+    {
+        Vector2 worldMouse = Raylib.GetScreenToWorld2D(mouse, camera);
+        bodies.Add(new PlanetBody(worldMouse, Vector2.Zero, 40f, 8f, new Color(120, 190, 255, 255), false));
+        selectedBodyIndex = bodies.Count - 1;
+        statusMessage = "Planet spawned";
+    }
+
+    if (selectedBodyIndex >= 0 && selectedBodyIndex < bodies.Count)
+    {
+        if (Raylib.IsKeyPressed(KeyboardKey.X))
+        {
+            bodies.RemoveAt(selectedBodyIndex);
+            selectedBodyIndex = -1;
+            statusMessage = "Body removed";
+        }
+        else if (Raylib.IsKeyPressed((KeyboardKey)49))
+        {
+            bodies[selectedBodyIndex] = ReplaceBody(bodies[selectedBodyIndex], BodyKind.Planet);
+        }
+        else if (Raylib.IsKeyPressed((KeyboardKey)50))
+        {
+            bodies[selectedBodyIndex] = ReplaceBody(bodies[selectedBodyIndex], BodyKind.Star);
+        }
+        else if (Raylib.IsKeyPressed((KeyboardKey)51))
+        {
+            bodies[selectedBodyIndex] = ReplaceBody(bodies[selectedBodyIndex], BodyKind.BlackHole);
+        }
+        else if (Raylib.IsKeyPressed((KeyboardKey)52))
+        {
+            bodies[selectedBodyIndex] = ReplaceBody(bodies[selectedBodyIndex], BodyKind.Pulsar);
+        }
+        else if (Raylib.IsKeyPressed((KeyboardKey)53))
+        {
+            bodies[selectedBodyIndex] = ReplaceBody(bodies[selectedBodyIndex], BodyKind.Quasar);
+        }
+    }
+}
+
+static int FindBodyAtPoint(IReadOnlyList<Body> bodies, Vector2 point)
+{
+    int selected = -1;
+    float closestDistance = float.MaxValue;
+    for (int i = 0; i < bodies.Count; i++)
+    {
+        if (bodies[i].IsConsumed)
+        {
+            continue;
+        }
+
+        float distance = Vector2.DistanceSquared(point, bodies[i].Position);
+        float hitRadius = MathF.Max(18f, bodies[i].Radius * 2f);
+        if (distance <= hitRadius * hitRadius && distance < closestDistance)
+        {
+            selected = i;
+            closestDistance = distance;
+        }
+    }
+
+    return selected;
+}
+
+static Body ReplaceBody(Body source, BodyKind kind)
+{
+    Body replacement = kind switch
+    {
+        BodyKind.Planet => new PlanetBody(source.Position, source.Velocity, source.Mass, source.Radius, source.Color, false),
+        BodyKind.Star => new StarBody(source.Position, source.Velocity, MathF.Max(1000f, source.Mass), MathF.Max(6f, source.Radius), source.Color, false),
+        BodyKind.BlackHole => new BlackHoleBody(source.Position, source.Velocity, MathF.Max(100000f, source.Mass), MathF.Max(18f, source.Radius), new Color(8, 8, 14, 255), false),
+        BodyKind.Pulsar => new PulsarBody(source.Position, source.Velocity, MathF.Max(100000f, source.Mass), MathF.Max(8f, source.Radius), new Color(150, 220, 255, 255), false),
+        BodyKind.Quasar => new QuasarBody(source.Position, source.Velocity, MathF.Max(9000000f, source.Mass), MathF.Max(30f, source.Radius), new Color(255, 160, 70, 255), false),
+        _ => source.CloneBody()
+    };
+
+    replacement.Acceleration = source.Acceleration;
+    return replacement;
 }
 
 static void SaveCurrentSimulation(
@@ -410,7 +682,7 @@ static void UpdateCamera(ref Camera2D camera, int screenWidth, int screenHeight)
     if (wheelMove != 0f)
     {
         float zoomFactor = 1f + wheelMove * 0.1f;
-        camera.Zoom = Math.Clamp(camera.Zoom * zoomFactor, 0.05f, 8f);
+        camera.Zoom = Math.Clamp(camera.Zoom * zoomFactor, 0.01f, 8f);
     }
 
     // Mantener el botón derecho pulsado permite desplazar la vista por el espacio.
@@ -424,17 +696,52 @@ static void UpdateCamera(ref Camera2D camera, int screenWidth, int screenHeight)
     camera.Offset = new Vector2(screenWidth * 0.5f, screenHeight * 0.5f);
 }
 
-static void DrawBodies(List<Body> bodies, Camera2D camera)
+static void DrawBodies(List<Body> bodies, Camera2D camera, int screenWidth, int screenHeight)
 {
     // Todo lo dibujado aquí se ve afectado por la cámara y su zoom.
+    float halfWidth = screenWidth / (2f * camera.Zoom);
+    float halfHeight = screenHeight / (2f * camera.Zoom);
+    float left = camera.Target.X - halfWidth;
+    float right = camera.Target.X + halfWidth;
+    float top = camera.Target.Y - halfHeight;
+    float bottom = camera.Target.Y + halfHeight;
+
     Raylib.BeginMode2D(camera);
 
     foreach (var body in bodies)
     {
+        // El culling evita llamadas de dibujo para cuerpos fuera de la vista actual.
+        if (!IsVisibleInCamera(body, left, right, top, bottom))
+        {
+            continue;
+        }
+
         DrawBodyVisual(body);
     }
 
     Raylib.EndMode2D();
+}
+
+static bool IsVisibleInCamera(Body body, float left, float right, float top, float bottom)
+{
+    float padding = body.Radius;
+    if (body is QuasarBody quasar)
+    {
+        padding = MathF.Max(padding, quasar.JetLength + quasar.JetWidth);
+    }
+    else if (body is PulsarBody pulsar)
+    {
+        padding = MathF.Max(padding, pulsar.JetLength + pulsar.Radius);
+    }
+    else if (body.IsBeingAbsorbed)
+    {
+        padding = MathF.Max(padding, body.OriginalRadius * 12f);
+    }
+
+    return body.Position.X + padding >= left
+        && body.Position.X - padding <= right
+        && body.Position.Y + padding >= top
+        && body.Position.Y - padding <= bottom;
 }
 
 static void DrawBodyVisual(Body body)
@@ -567,8 +874,11 @@ static void DrawPixelation(Body body)
 static void DrawUiPanel(
     IReadOnlyList<GalaxyBuilder.SceneDefinition> scenes,
     int selectedSceneIndex,
+    List<Body> bodies,
     List<SimulationRecord> savedSimulations,
     int selectedSaveId,
+    int selectedBodyIndex,
+    float simulationSpeed,
     bool editingSaveName,
     string statusMessage,
     string saveName,
@@ -644,12 +954,17 @@ static void DrawUiPanel(
 
     Raylib.DrawRectangleRec(layout.BottomBar, new Color(10, 10, 20, 220));
     Raylib.DrawRectangleLinesEx(layout.BottomBar, 2f, new Color(180, 180, 255, 255));
+    string selectedInfo = selectedBodyIndex >= 0 && selectedBodyIndex < bodies.Count
+        ? $"Selected: {bodies[selectedBodyIndex].TypeName} | M {bodies[selectedBodyIndex].Mass:0.##} | R {bodies[selectedBodyIndex].Radius:0.##} | V {bodies[selectedBodyIndex].Velocity.Length():0.##}"
+        : "Selected: none";
     Raylib.DrawText($"Status: {ClipText(statusMessage, 70)}", (int)layout.BottomBar.X + 12, (int)layout.BottomBar.Y + 8, 14, new Color(255, 255, 180, 255));
     Raylib.DrawText($"Name: {ClipText(saveName, 26)}", (int)layout.BottomBar.X + 12, (int)layout.BottomBar.Y + 30, 12, new Color(255, 255, 255, 255));
+    Raylib.DrawText(ClipText(selectedInfo, 78), (int)layout.BottomBar.X + 250, (int)layout.BottomBar.Y + 30, 12, new Color(180, 255, 200, 255));
+    Raylib.DrawText($"Speed: {simulationSpeed:0.###}x", (int)layout.BottomBar.X + (int)layout.BottomBar.Width - 150, (int)layout.BottomBar.Y + 8, 12, new Color(255, 255, 0, 255));
     Raylib.DrawText($"FPS: {Raylib.GetFPS()}", (int)layout.BottomBar.X + (int)layout.BottomBar.Width - 70, (int)layout.BottomBar.Y + 8, 14, new Color(255, 255, 0, 255));
     float ms = Raylib.GetFrameTime() * 1000f;
     Raylib.DrawText($"Frame time: {ms:F2} ms", (int)layout.BottomBar.X + (int)layout.BottomBar.Width - 135, (int)layout.BottomBar.Y + 30, 12, new Color(255, 255, 0, 255));
-    Raylib.DrawText("F10 maximize | F11 fullscreen | C scene | Space pause", (int)layout.BottomBar.X + 12, (int)layout.BottomBar.Y + 46, 12, new Color(180, 200, 255, 255));
+    Raylib.DrawText("+/- speed | N spawn planet | X delete | 1-5 replace selected", (int)layout.BottomBar.X + 12, (int)layout.BottomBar.Y + 46, 12, new Color(180, 200, 255, 255));
 }
 
 static void DrawButton(Rectangle rect, string label, Color fill, bool enabled)

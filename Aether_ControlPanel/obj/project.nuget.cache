@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "dgSpecHash": "M5SwPvmDF2o=",
+  "success": true,
+  "projectFilePath": "D:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_ControlPanel\\Aether_ControlPanel.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Alejandro\\.nuget\\packages\\microsoft.netcore.app.ref\\8.0.28\\microsoft.netcore.app.ref.8.0.28.nupkg.sha512",
+    "C:\\Users\\Alejandro\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\8.0.28\\microsoft.windowsdesktop.app.ref.8.0.28.nupkg.sha512",
+    "C:\\Users\\Alejandro\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\8.0.28\\microsoft.aspnetcore.app.ref.8.0.28.nupkg.sha512",
+    "C:\\Users\\Alejandro\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\8.0.28\\microsoft.netcore.app.host.win-x64.8.0.28.nupkg.sha512"
+  ],
+  "logs": [
+    {
+      "code": "NU1900",
+      "level": "Warning",
+      "message": "Error al obtener los datos de vulnerabilidad del paquete: No se puede cargar el índice de servicio del origen https://api.nuget.org/v3/index.json.",
+      "projectPath": "D:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_ControlPanel\\Aether_ControlPanel.csproj",
+      "warningLevel": 1,
+      "filePath": "D:\\Cibernética\\Proyects\\Aether_NBody_Simulation\\Aether_ControlPanel\\Aether_ControlPanel.csproj",
+      "targetGraphs": []
+    }
+  ]
+}

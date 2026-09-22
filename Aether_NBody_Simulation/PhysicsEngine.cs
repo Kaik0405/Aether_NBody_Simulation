@@ -1,4 +1,5 @@
 using System.Numerics;
+using Raylib_cs;
 
 namespace Aether_NBody_Simulation;
 
@@ -14,8 +15,16 @@ public enum PhysicsSolverMode
 /// </summary>
 public sealed class PhysicsEngine
 {
-    private const float GravitationalConstant = 1f;
-    private const float Epsilon = 5f;
+    /// <summary>Constante gravitatoria de las unidades internas de la simulación.</summary>
+    public const float GravitationalConstant = 1f;
+    // Suavizado corto para evitar impulsos extremos en encuentros muy cercanos.
+    private const float Epsilon = 8f;
+
+    /// <summary>Evita que un frame bloqueado introduzca un salto físico inestable.</summary>
+    public float MaximumTimeStep { get; set; } = 1f / 60f;
+
+    /// <summary>Multiplicador temporal editable desde la interfaz.</summary>
+    public float SimulationSpeed { get; set; } = 1f;
 
     /// <summary>
     /// Valor theta de Barnes-Hut: menor => más preciso, mayor => más rápido.
@@ -36,10 +45,17 @@ public sealed class PhysicsEngine
 
     public void Update(List<Body> bodies, float dt)
     {
-        // Leapfrog mantiene separadas las actualizaciones de velocidad, posición y aceleración.
-        StepLeapfrog(bodies, dt);
-        UpdateBlackHoleEffects(bodies, dt);
-        UpdateVisualAnimations(bodies, dt);
+        // A velocidades altas se ejecutan varios subpasos acotados para conservar estabilidad numérica.
+        float remainingTime = MathF.Max(0f, dt) * SimulationSpeed;
+        while (remainingTime > 0f)
+        {
+            float step = MathF.Min(remainingTime, MaximumTimeStep);
+            StepLeapfrog(bodies, step);
+            UpdateBlackHoleEffects(bodies, step);
+            UpdateVisualAnimations(bodies, step);
+            UpdateStellarLifecycle(bodies, step);
+            remainingTime -= step;
+        }
 
         if (!RecordTrails)
         {
@@ -248,6 +264,35 @@ public sealed class PhysicsEngine
             {
                 quasar.VisualRotation += 0.35f * dt;
             }
+        }
+    }
+
+    private static void UpdateStellarLifecycle(List<Body> bodies, float dt)
+    {
+        for (int i = 0; i < bodies.Count; i++)
+        {
+            if (bodies[i] is not StarBody star || star.IsStatic || star.HasEvolved)
+            {
+                continue;
+            }
+
+            star.Age += dt;
+            float lifeProgress = Math.Clamp(star.Age / MathF.Max(1f, star.Lifetime), 0f, 1f);
+            star.Radius = star.OriginalRadius * (1f - lifeProgress * 0.25f);
+            if (star.Age < star.Lifetime)
+            {
+                continue;
+            }
+
+            // La estrella se reemplaza conservando posición y velocidad para evitar un salto orbital.
+            Body remnant = star.Mass >= 2200f
+                ? new BlackHoleBody(star.Position, star.Velocity, star.Mass * 1.2f, star.Radius * 1.35f, new Color(8, 8, 14, 255), false)
+                : new PulsarBody(star.Position, star.Velocity, star.Mass * 0.8f, MathF.Max(7f, star.Radius * 0.65f), new Color(150, 220, 255, 255), false);
+
+            remnant.Acceleration = star.Acceleration;
+            remnant.Age = star.Age;
+            remnant.HasEvolved = true;
+            bodies[i] = remnant;
         }
     }
 
