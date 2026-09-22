@@ -264,15 +264,6 @@ The quadtree reduces the dominant interaction calculation from the naive all-pai
 - Automated physics regression tests.
 - Release packaging for Windows.
 
-## Topics
-
-Recommended GitHub topics:
-
-`csharp` `dotnet` `dotnet8` `raylib` `raylib-cs` `wpf` `n-body-simulation` `gravity-simulation` `astrophysics` `computational-physics` `barnes-hut` `quadtree` `leapfrog-integrator` `galaxy-simulation` `black-hole` `quasar` `pulsar` `numerical-simulation` `desktop-application`
-
-## Repository description
-
-> Interactive C#/.NET 2D N-body laboratory with Raylib and WPF: Barnes–Hut gravity, Leapfrog integration, spiral galaxies, quasars, pulsars, black-hole effects, stellar evolution, and multi-galaxy expansion.
 
 ## License
 
