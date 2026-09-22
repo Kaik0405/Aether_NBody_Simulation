@@ -311,19 +311,6 @@ Increasing the simulation speed intentionally increases the amount of simulated 
 - Automated physics regression tests.
 - Windows release packaging.
 
-## 🔎 Recommended GitHub topics
-
-```text
-csharp dotnet dotnet8 raylib raylib-cs wpf n-body-simulation
-gravity-simulation astrophysics computational-physics barnes-hut
-quadtree leapfrog-integrator galaxy-simulation black-hole quasar
-pulsar numerical-simulation desktop-application
-```
-
-## Repository description
-
-> Interactive C#/.NET 2D N-body laboratory with Raylib and WPF: Barnes–Hut gravity, Leapfrog integration, spiral galaxies, quasars, pulsars, black-hole effects, stellar evolution, and multi-galaxy expansion.
-
 ## 🤝 Contributing
 
 Aether is structured as an experimental and educational project. Contributions are welcome, especially in:
